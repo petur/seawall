@@ -113,10 +113,13 @@ struct Position
 Memo Position::do_move(Move mv)
 {
     Memo memo{squares[to(mv)], castling, en_passant, halfmove_clock};
+    ++halfmove_clock;
+
     if (type(mv) & CAPTURE)
     {
         color_bb[color(memo.captured)] &= ~to(mv);
         type_bb[type(memo.captured)] &= ~to(mv);
+        halfmove_clock = 0;
     }
     Piece moved = squares[from(mv)];
     color_bb[color(moved)] &= ~from(mv);
@@ -125,9 +128,14 @@ Memo Position::do_move(Move mv)
     type_bb[type(moved)] |= to(mv);
     squares[from(mv)] = NONE;
     squares[to(mv)] = moved;
+    en_passant = NO_SQUARE;
 
-    if (type(mv) & EN_PASSANT)
-        en_passant = static_cast<Square>(next == WHITE ? from(mv) + 8 : from(mv) - 8);
+    if (type(moved) == PAWN)
+    {
+        halfmove_clock = 0;
+        if (type(mv) & EN_PASSANT)
+            en_passant = static_cast<Square>(next == WHITE ? from(mv) + 8 : from(mv) - 8);
+    }
 
     next = ~next;
     return memo;

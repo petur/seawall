@@ -22,6 +22,9 @@ inline PieceType type(Piece p) { return static_cast<PieceType>(p & 7); }
 enum Castling : std::uint8_t { WQ = 1 << 0, WK = 1 << 1, BQ = 1 << 2, BK = 1 << 3 };
 
 inline Castling& operator|=(Castling& lhs, Castling rhs) { return lhs = static_cast<Castling>(lhs | rhs); }
+inline Castling& operator&=(Castling& lhs, Castling rhs) { return lhs = static_cast<Castling>(lhs & rhs); }
+inline Castling operator~(Castling c) { return static_cast<Castling>(~static_cast<std::uint8_t>(c)); }
+
 std::ostream& operator<<(std::ostream& out, Castling c)
 {
     if (c)
@@ -136,6 +139,19 @@ Memo Position::do_move(Move mv)
         if (type(mv) & EN_PASSANT)
             en_passant = static_cast<Square>(next == WHITE ? from(mv) + 8 : from(mv) - 8);
     }
+    else if (type(mv) & CASTLING)
+    {
+        int rank = from(mv) & ~7;
+        Square rook_from = static_cast<Square>(rank | (to(mv) < from(mv) ? 0 : 7));
+        Square rook_to = static_cast<Square>(rank | (to(mv) < from(mv) ? 3 : 5));
+        color_bb[next] |= rook_to;
+        type_bb[ROOK] |= rook_to;
+        squares[rook_to] = squares[rook_from];
+        color_bb[next] &= ~rook_from;
+        type_bb[ROOK] &= ~rook_from;
+        squares[rook_from] = NONE;
+        castling &= ~static_cast<Castling>(3 << (2 * next));
+    }
 
     next = ~next;
     return memo;
@@ -241,7 +257,7 @@ Move Position::parse_move(std::string_view s) const
     }
     else if (type(squares[from]) == KING)
     {
-        if (std::abs((from & 7) - (to & 7) > 1))
+        if (std::abs((from & 7) - (to & 7)) > 1)
             mt |= CASTLING;
     }
 

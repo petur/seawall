@@ -99,6 +99,7 @@ struct Memo
 struct Position
 {
     Memo do_move(Move mv);
+    void undo_move(Move mv, const Memo& memo);
 
     void parse(std::istream& fen);
     Move parse_move(std::string_view s) const;
@@ -183,6 +184,48 @@ Memo Position::do_move(Move mv)
 
     next = ~next;
     return memo;
+}
+
+void Position::undo_move(Move mv, const Memo& memo)
+{
+    next = ~next;
+    halfmove_clock = memo.halfmove_clock;
+    en_passant = memo.en_passant;
+    castling = memo.castling;
+
+    Piece moved = squares[to(mv)];
+    color_bb[color(moved)] &= ~to(mv);
+    type_bb[type(moved)] &= ~to(mv);
+    color_bb[color(moved)] |= from(mv);
+    type_bb[type(moved)] |= from(mv);
+    squares[to(mv)] = NONE;
+    squares[from(mv)] = moved;
+
+    MoveType mt = type(mv);
+    if (mt & CAPTURE)
+    {
+        mt &= ~CAPTURE;
+        Square cap_sq = to(mv);
+        if (mt == EN_PASSANT)
+            cap_sq = static_cast<Square>(cap_sq + rank_fwd(~next));
+        squares[cap_sq] = memo.captured;
+
+        color_bb[color(memo.captured)] |= cap_sq;
+        type_bb[type(memo.captured)] |= cap_sq;
+    }
+
+    if (mt == CASTLING)
+    {
+        int rank = from(mv) & ~7;
+        Square rook_from = static_cast<Square>(rank | (to(mv) < from(mv) ? 0 : 7));
+        Square rook_to = static_cast<Square>(rank | (to(mv) < from(mv) ? 3 : 5));
+        color_bb[next] |= rook_from;
+        type_bb[ROOK] |= rook_from;
+        squares[rook_from] = squares[rook_to];
+        color_bb[next] &= ~rook_to;
+        type_bb[ROOK] &= ~rook_to;
+        squares[rook_to] = NONE;
+    }
 }
 
 void Position::parse(std::istream& fen)

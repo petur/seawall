@@ -152,6 +152,15 @@ Memo Position::do_move(Move mv)
         squares[rook_from] = NONE;
         castling &= ~static_cast<Castling>(3 << (2 * next));
     }
+    else if (castling)
+    {
+        if (type(moved) == KING)
+            castling &= ~static_cast<Castling>(3 << (2 * next));
+        else if (type(moved) == ROOK)
+            castling &= ~static_cast<Castling>(((from(mv) & 1) ? WK : WQ) << (2 * next));
+        if ((type(mv) & CAPTURE) && type(memo.captured) == ROOK)
+            castling &= ~static_cast<Castling>(((to(mv) & 1) ? WK : WQ) << (2 * ~next));
+    }
 
     next = ~next;
     return memo;

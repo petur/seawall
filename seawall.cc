@@ -6,6 +6,7 @@
 enum Color : std::uint8_t { WHITE, BLACK };
 
 inline Color operator~(Color c) { return static_cast<Color>(c ^ 1); }
+inline int rank_fwd(Color c) { return c == WHITE ? 8 : -8; }
 
 enum PieceType : std::uint8_t { PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING };
 
@@ -75,10 +76,8 @@ inline BitBoard operator~(Square sq) { return static_cast<BitBoard>(~(1ULL << sq
 
 enum MoveType : std::uint8_t { REGULAR, EN_PASSANT = 6, CASTLING, CAPTURE, INVALID_TYPE = 15 };
 
-inline MoveType& operator|=(MoveType& lhs, MoveType rhs)
-{
-    return lhs = static_cast<MoveType>(lhs | rhs);
-}
+inline MoveType& operator|=(MoveType& lhs, MoveType rhs) { return lhs = static_cast<MoveType>(lhs | rhs); }
+inline MoveType operator|(MoveType lhs, MoveType rhs) { return lhs |= rhs; }
 
 enum Move : std::uint16_t { NULL_MOVE = 0, INVALID = 0xffff };
 
@@ -120,8 +119,16 @@ Memo Position::do_move(Move mv)
 
     if (type(mv) & CAPTURE)
     {
-        color_bb[color(memo.captured)] &= ~to(mv);
-        type_bb[type(memo.captured)] &= ~to(mv);
+        Square cap_sq = to(mv);
+        if (type(mv) & EN_PASSANT)
+        {
+            cap_sq = static_cast<Square>(cap_sq + rank_fwd(~next));
+            memo.captured = squares[cap_sq];
+            squares[cap_sq] = NONE;
+        }
+
+        color_bb[color(memo.captured)] &= ~cap_sq;
+        type_bb[type(memo.captured)] &= ~cap_sq;
         halfmove_clock = 0;
     }
     Piece moved = squares[from(mv)];
@@ -136,8 +143,8 @@ Memo Position::do_move(Move mv)
     if (type(moved) == PAWN)
     {
         halfmove_clock = 0;
-        if (type(mv) & EN_PASSANT)
-            en_passant = static_cast<Square>(next == WHITE ? from(mv) + 8 : from(mv) - 8);
+        if ((type(mv) & EN_PASSANT) && !(type(mv) & CAPTURE))
+            en_passant = static_cast<Square>(from(mv) + rank_fwd(next));
     }
     else if (type(mv) & CASTLING)
     {
@@ -260,7 +267,7 @@ Move Position::parse_move(std::string_view s) const
     else if (type(squares[from]) == PAWN)
     {
         if (to == en_passant)
-            mt |= EN_PASSANT;
+            mt |= EN_PASSANT | CAPTURE;
         else if (std::abs(from - to) == 16)
             mt |= EN_PASSANT;
     }

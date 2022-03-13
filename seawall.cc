@@ -279,6 +279,75 @@ std::ostream& operator<<(std::ostream& out, Move mv)
 }
 
 constexpr int material[6] = {100, 300, 300, 500, 900, 100000};
+constexpr int piece_square_table[6][64] =
+{
+    {
+        0, 1, 2, 3, 3, 2, 1, 0,
+        2, 3, 4, 5, 5, 4, 3, 2,
+        4, 5, 6, 7, 7, 6, 5, 4,
+        7, 8, 9, 10, 10, 9, 8, 7,
+        10, 11, 12, 13, 13, 12, 11, 10,
+        13, 14, 15, 16, 16, 15, 14, 13,
+        16, 17, 18, 19, 19, 18, 17, 16,
+        14, 15, 16, 17, 17, 16, 15, 14,
+    },
+    {
+        -10, 0, 1, 2, 2, 1, 0, -10,
+        0, 3, 4, 5, 5, 4, 3, 0,
+        3, 6, 7, 8, 8, 7, 6, 3,
+        5, 8, 9, 10, 10, 9, 8, 5,
+        8, 11, 12, 13, 13, 12, 11, 8,
+        10, 13, 14, 15, 15, 14, 13, 10,
+        8, 11, 12, 13, 13, 12, 11, 8,
+        0, 8, 9, 10, 10, 9, 8, 0,
+    },
+    {
+        0, 1, 2, 3, 3, 2, 1, 0,
+        2, 3, 4, 5, 5, 4, 3, 2,
+        4, 5, 6, 7, 7, 6, 5, 4,
+        6, 7, 8, 9, 9, 8, 7, 6,
+        8, 9, 10, 11, 11, 10, 9, 8,
+        10, 11, 12, 13, 13, 12, 11, 10,
+        12, 13, 14, 15, 15, 14, 13, 12,
+        14, 15, 16, 17, 17, 16, 15, 14,
+    },
+    {
+        0, 1, 2, 3, 3, 2, 1, 0,
+        2, 3, 4, 5, 5, 4, 3, 2,
+        4, 5, 6, 7, 7, 6, 5, 4,
+        6, 7, 8, 9, 9, 8, 7, 6,
+        8, 9, 10, 11, 11, 10, 9, 8,
+        10, 11, 12, 13, 13, 12, 11, 10,
+        12, 13, 14, 15, 15, 14, 13, 12,
+        14, 15, 16, 17, 17, 16, 15, 14,
+    },
+    {
+        0, 1, 2, 3, 3, 2, 1, 0,
+        2, 3, 4, 5, 5, 4, 3, 2,
+        4, 5, 6, 7, 7, 6, 5, 4,
+        6, 7, 8, 9, 9, 8, 7, 6,
+        8, 9, 10, 11, 11, 10, 9, 8,
+        10, 11, 12, 13, 13, 12, 11, 10,
+        12, 13, 14, 15, 15, 14, 13, 12,
+        14, 15, 16, 17, 17, 16, 15, 14,
+    },
+    {
+        0, 1, 2, 3, 3, 2, 1, 0,
+        2, 3, 4, 5, 5, 4, 3, 2,
+        4, 5, 6, 7, 7, 6, 5, 4,
+        6, 7, 8, 9, 9, 8, 7, 6,
+        8, 9, 10, 11, 11, 10, 9, 8,
+        10, 11, 12, 13, 13, 12, 11, 10,
+        12, 13, 14, 15, 15, 14, 13, 12,
+        14, 15, 16, 17, 17, 16, 15, 14,
+    },
+};
+
+int piece_square_value(Square sq, Color c, PieceType t)
+{
+    unsigned flip = c == WHITE ? 0 : 56;
+    return material[t] + piece_square_table[t][sq ^ flip];
+}
 
 struct Memo
 {
@@ -316,7 +385,7 @@ struct Position
     Square en_passant;
     int halfmove_clock;
     std::uint64_t piece_hash;
-    int material_values[2];
+    int piece_square_values[2];
 } position;
 
 void Position::clear(Square sq, Color c, PieceType t)
@@ -325,7 +394,7 @@ void Position::clear(Square sq, Color c, PieceType t)
     type_bb[t] &= ~sq;
     squares[sq] = NONE;
     piece_hash ^= piece_hash_values[sq | 64 * c | 128 * t];
-    material_values[c] -= material[t];
+    piece_square_values[c] -= piece_square_value(sq, c, t);
 }
 
 void Position::set(Square sq, Color c, PieceType t, Piece p)
@@ -335,7 +404,7 @@ void Position::set(Square sq, Color c, PieceType t, Piece p)
     type_bb[t] |= sq;
     squares[sq] = p;
     piece_hash ^= piece_hash_values[sq | 64 * c | 128 * t];
-    material_values[c] += material[t];
+    piece_square_values[c] += piece_square_value(sq, c, t);
 }
 
 Memo Position::do_move(Move mv)
@@ -435,7 +504,7 @@ void Position::parse(std::istream& fen)
         b = EMPTY;
     for (Piece& p : squares)
         p = NONE;
-    for (int& v : material_values)
+    for (int& v : piece_square_values)
         v = 0;
     Square sq = H1;
 
@@ -831,7 +900,7 @@ Move MoveGen::next()
 
 int evaluate()
 {
-    return position.material_values[position.next] - position.material_values[~position.next];
+    return position.piece_square_values[position.next] - position.piece_square_values[~position.next];
 }
 
 struct HashEntry

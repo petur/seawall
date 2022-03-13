@@ -687,6 +687,9 @@ std::pair<int, Move> search(int ply, int depth, int alpha, int beta)
 
     while (Move mv = gen.next())
     {
+        if (bb(to(mv)) & position.type_bb[KING] & position.color_bb[~position.next])
+            return {32767 - ply, mv};
+
         Memo memo = position.do_move(mv);
 
         int v;
@@ -719,7 +722,7 @@ void iterate(std::ostream& out, int max_depth, std::clock_t time)
         if (std::clock() - start > time)
             break;
 
-        auto v = search(0, depth, -32000, 32000);
+        auto v = search(0, depth, -32767, 32767);
         best = v.second;
         out << "info depth " << depth << " score cp " << v.first << " pv " << v.second << std::endl;
     }

@@ -772,14 +772,18 @@ BitBoard attackers(Square sq, Color c)
     );
 }
 
+enum MoveGenType { START, CAPTURES, QUIETS, END };
+
 struct MoveGen
 {
+    MoveGenType wanted;
+    MoveGenType generated;
     Move moves[256];
     int count;
     int index;
     Move best_move;
 
-    explicit MoveGen(Move best) : moves{}, count{}, index{}, best_move{best} {}
+    explicit MoveGen(MoveGenType w, Move best) : wanted{w}, generated{}, moves{}, count{}, index{}, best_move{best} {}
 
     Move next();
 
@@ -821,8 +825,10 @@ void MoveGen::generate_pawn_targets(Square sq, BitBoard targets, MoveType mt)
 
 void MoveGen::generate_targets(Square sq, BitBoard targets)
 {
-    generate_targets(sq, targets & position.color_bb[~position.next], CAPTURE);
-    generate_targets(sq, targets & ~position.all_bb(), {});
+    if (generated == CAPTURES)
+        generate_targets(sq, targets & position.color_bb[~position.next], CAPTURE);
+    if (generated == QUIETS)
+        generate_targets(sq, targets & ~position.all_bb(), {});
 }
 
 template<int Offset> void MoveGen::generate_castling(Square sq)
@@ -846,15 +852,21 @@ template<PieceType Type> void MoveGen::generate_piece(Square sq)
 {
     if (Type == PAWN)
     {
-        generate_pawn_targets(sq, pawn_attack[position.next][sq] & position.color_bb[~position.next], CAPTURE);
-        BitBoard push = pawn_push[position.next][sq] & ~position.all_bb();
-        if (push)
+        if (generated == CAPTURES)
         {
-            generate_pawn_targets(sq, push, {});
-            generate_targets(sq, pawn_double_push[position.next][sq] & ~position.all_bb(), EN_PASSANT);
+            generate_pawn_targets(sq, pawn_attack[position.next][sq] & position.color_bb[~position.next], CAPTURE);
+            if (position.en_passant != NO_SQUARE && (pawn_attack[position.next][sq] & position.en_passant))
+                generate_target(sq, position.en_passant, EN_PASSANT | CAPTURE);
         }
-        if (position.en_passant != NO_SQUARE && (pawn_attack[position.next][sq] & position.en_passant))
-            generate_target(sq, position.en_passant, EN_PASSANT | CAPTURE);
+        if (generated == QUIETS)
+        {
+            BitBoard push = pawn_push[position.next][sq] & ~position.all_bb();
+            if (push)
+            {
+                generate_pawn_targets(sq, push, {});
+                generate_targets(sq, pawn_double_push[position.next][sq] & ~position.all_bb(), EN_PASSANT);
+            }
+        }
     }
     else if (Type == KNIGHT)
         generate_targets(sq, knight_attack[sq]);
@@ -867,10 +879,13 @@ template<PieceType Type> void MoveGen::generate_piece(Square sq)
     else if (Type == KING)
     {
         generate_targets(sq, king_attack[sq]);
-        if (position.castling & (WQ << (2 * position.next)))
-            generate_castling<-1>(sq);
-        if (position.castling & (WK << (2 * position.next)))
-            generate_castling<1>(sq);
+        if (generated == QUIETS)
+        {
+            if (position.castling & (WQ << (2 * position.next)))
+                generate_castling<-1>(sq);
+            if (position.castling & (WK << (2 * position.next)))
+                generate_castling<1>(sq);
+        }
     }
 }
 
@@ -883,6 +898,7 @@ template<PieceType Type> void MoveGen::generate_pieces()
 
 void MoveGen::generate()
 {
+    generated = static_cast<MoveGenType>(generated + 1);
     generate_pieces<PAWN>();
     generate_pieces<KNIGHT>();
     generate_pieces<BISHOP>();
@@ -893,7 +909,7 @@ void MoveGen::generate()
 
 Move MoveGen::next()
 {
-    if (count == 0)
+    while (index >= count && generated < wanted)
         generate();
     if (index >= count)
         return NULL_MOVE;
@@ -1006,7 +1022,7 @@ bool Search::is_stopped(bool max)
 std::pair<int, Move> Search::search(int ply, int depth, int alpha, int beta)
 {
     HashEntry* he = load_hash();
-    MoveGen gen{he ? he->best_move : NULL_MOVE};
+    MoveGen gen{QUIETS, he ? he->best_move : NULL_MOVE};
     Move best = NULL_MOVE;
 
     Square king_sq = first_square(position.type_bb[KING] & position.color_bb[position.next]);

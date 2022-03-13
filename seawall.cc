@@ -1,3 +1,4 @@
+#include <ctime>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -54,9 +55,14 @@ inline Square operator++(Square& lhs, int)
     return r;
 }
 
+inline Square square(int file, int rank)
+{
+    return static_cast<Square>(file + (rank << 3));
+}
+
 Square parse_square(std::string_view s)
 {
-    return static_cast<Square>((s[0] - 'a') + ((s[1] - '1') << 3));
+    return square(s[0] - 'a', s[1] - '1');
 }
 
 std::ostream& operator<<(std::ostream& out, Square sq)
@@ -70,9 +76,25 @@ std::ostream& operator<<(std::ostream& out, Square sq)
 
 enum BitBoard : std::uint64_t { EMPTY = 0, ALL = ~0ULL };
 
-inline BitBoard& operator|=(BitBoard& lhs, Square rhs) { return lhs = static_cast<BitBoard>(lhs | 1ULL << rhs); }
+inline BitBoard bb(Square s) { return static_cast<BitBoard>(1ULL << s); }
+inline BitBoard& operator|=(BitBoard& lhs, Square rhs) { return lhs = static_cast<BitBoard>(lhs | bb(rhs)); }
+inline BitBoard& operator|=(BitBoard& lhs, BitBoard rhs) { return lhs = static_cast<BitBoard>(lhs | rhs); }
 inline BitBoard& operator&=(BitBoard& lhs, BitBoard rhs) { return lhs = static_cast<BitBoard>(lhs & rhs); }
-inline BitBoard operator~(Square sq) { return static_cast<BitBoard>(~(1ULL << sq)); }
+inline BitBoard operator|(BitBoard lhs, BitBoard rhs) { return static_cast<BitBoard>(static_cast<uint64_t>(lhs) | rhs); }
+inline BitBoard operator&(BitBoard lhs, BitBoard rhs) { return static_cast<BitBoard>(static_cast<uint64_t>(lhs) & rhs); }
+inline BitBoard operator<<(BitBoard lhs, int rhs) { return static_cast<BitBoard>(static_cast<uint64_t>(lhs) << rhs); }
+inline BitBoard operator>>(BitBoard lhs, int rhs) { return static_cast<BitBoard>(static_cast<uint64_t>(lhs) >> rhs); }
+inline BitBoard operator~(BitBoard b) { return static_cast<BitBoard>(~static_cast<std::uint64_t>(b)); }
+inline BitBoard operator~(Square sq) { return ~bb(sq); }
+
+inline Square pop(BitBoard& b)
+{
+    Square ret = static_cast<Square>(__builtin_ctzll(b));
+    b &= ~ret;
+    return ret;
+}
+
+inline int popcount(BitBoard b) { return __builtin_popcountll(b); }
 
 enum MoveType : std::uint8_t { REGULAR, EN_PASSANT = 6, CASTLING, CAPTURE, INVALID_TYPE = 15 };
 
@@ -87,6 +109,19 @@ inline Move move(Square from, Square to, MoveType type) { return static_cast<Mov
 inline Square from(Move mv) { return static_cast<Square>(mv & 63); }
 inline Square to(Move mv) { return static_cast<Square>((mv >> 6) & 63); }
 inline MoveType type(Move mv) { return static_cast<MoveType>((mv >> 12) & 15); }
+
+std::ostream& operator<<(std::ostream& out, Move mv)
+{
+    out << from(mv) << to(mv);
+    switch (type(mv) & ~CAPTURE)
+    {
+        case QUEEN: out << 'q'; break;
+        case ROOK: out << 'r'; break;
+        case BISHOP: out << 'b'; break;
+        case KNIGHT: out << 'n'; break;
+    }
+    return out;
+}
 
 struct Memo
 {
@@ -105,6 +140,8 @@ struct Position
     Move parse_move(std::string_view s) const;
 
     void debug(std::ostream& out);
+
+    BitBoard all_bb() const { return color_bb[WHITE] | color_bb[BLACK]; }
 
     Piece squares[64];
     BitBoard color_bb[2];
@@ -347,7 +384,7 @@ void Position::debug(std::ostream& out)
 
         for (int file = 0; file < 8; ++file)
         {
-            Square sq = static_cast<Square>(8 * rank + file);
+            Square sq = square(file, rank);
             if (squares[sq] == NONE)
             {
                 ++blanks;
@@ -390,16 +427,299 @@ void Position::debug(std::ostream& out)
     out << ' ' << (next == WHITE ? 'w' : 'b') << ' ' << castling << ' ' << en_passant << ' ' << halfmove_clock << " 1\n";
 }
 
-void search(int ply, int depth)
+BitBoard knight_attack[64];
+BitBoard king_attack[64];
+BitBoard pawn_attack[2][64];
+BitBoard pawn_push[2][64];
+BitBoard pawn_double_push[2][64];
+BitBoard ray[64][8];
+
+BitBoard offset_bitboard(int file, int rank, const std::pair<int, int> (&offsets)[8])
 {
-    (void) ply;
-    (void) depth;
+    BitBoard ret{};
+    for (auto off : offsets)
+    {
+        if (file + off.first >= 0 && file + off.first <= 7 && rank + off.second >= 0 && rank + off.second <= 7)
+            ret |= square(file + off.first, rank + off.second);
+    }
+    return ret;
 }
 
-void iterate()
+void init_bitboards()
 {
-    for (int depth = 1; ; ++depth)
-        search(0, depth);
+    constexpr std::pair<int, int> knight_offsets[8] = {{-2, -1}, {-1, -2}, {2, -1}, {-1, 2}, {-2, 1}, {1, -2}, {2, 1}, {1, 2}};
+    constexpr std::pair<int, int> king_offsets[8] = {{-1, -1}, {-1, 0}, {-1, 1}, {0, -1}, {0, 1}, {1, -1}, {1, 0}, {1, 1}};
+    constexpr std::pair<int, int> ray_offsets[8] = {{-1, -1}, {-1, 0}, {-1, 1}, {0, 1}, {1, 1}, {1, 0}, {1, -1}, {0, -1}};
+
+    for (Square sq = A1; sq <= H8; sq++)
+    {
+        int file = sq & 7;
+        int rank = sq >> 3;
+
+        knight_attack[sq] = offset_bitboard(file, rank, knight_offsets);
+        king_attack[sq] = offset_bitboard(file, rank, king_offsets);
+
+        for (Color c : {WHITE, BLACK})
+        {
+            if (rank == (c == WHITE ? 7 : 0))
+                continue;
+            if (file > 0)
+                pawn_attack[c][sq] |= static_cast<Square>(sq - 1 + rank_fwd(c));
+            if (file < 7)
+                pawn_attack[c][sq] |= static_cast<Square>(sq + 1 + rank_fwd(c));
+
+            pawn_push[c][sq] = bb(static_cast<Square>(sq + rank_fwd(c)));
+
+            if (rank == (c == WHITE ? 1 : 6))
+                pawn_double_push[c][sq] = bb(static_cast<Square>(sq + 2 * rank_fwd(c)));
+        }
+
+        for (int i = 0; i < 8; ++i)
+        {
+            auto off = ray_offsets[i];
+            int f = file + off.first;
+            int r = rank + off.second;
+            while (f >= 0 && f <= 7 && r >= 0 && r <= 7)
+            {
+                ray[sq][i] |= square(f, r);
+                f += off.first;
+                r += off.second;
+            }
+        }
+    }
+}
+
+template <int N> BitBoard shift_signed(BitBoard b)
+{
+    if (N > 0)
+        return b << N;
+    else
+        return b >> -N;
+}
+
+template <int Shift> BitBoard ray_attack(BitBoard ray, BitBoard blockers)
+{
+    BitBoard v = ray & blockers;
+    v = shift_signed<Shift>(v);
+    v |= shift_signed<Shift>(v);
+    v |= shift_signed<Shift * 2>(v);
+    v |= shift_signed<Shift * 4>(v);
+    return ray & ~v;
+}
+
+BitBoard bishop_attack(Square sq, BitBoard blockers)
+{
+    return ray_attack<-9>(ray[sq][0], blockers)
+        | ray_attack<7>(ray[sq][2], blockers)
+        | ray_attack<9>(ray[sq][4], blockers)
+        | ray_attack<-7>(ray[sq][6], blockers);
+}
+
+BitBoard rook_attack(Square sq, BitBoard blockers)
+{
+    return ray_attack<-1>(ray[sq][1], blockers)
+        | ray_attack<8>(ray[sq][3], blockers)
+        | ray_attack<1>(ray[sq][5], blockers)
+        | ray_attack<-8>(ray[sq][7], blockers);
+}
+
+BitBoard queen_attack(Square sq, BitBoard blockers)
+{
+    return bishop_attack(sq, blockers) | rook_attack(sq, blockers);
+}
+
+struct MoveGen
+{
+    Move moves[256];
+    int count;
+    int index;
+
+    Move next();
+
+    void generate();
+    template<PieceType Type> void generate_pieces();
+    template<PieceType Type> void generate_piece(Square sq);
+    void generate_targets(Square sq, BitBoard targets);
+    void generate_targets(Square sq, BitBoard targets, MoveType mt);
+    void generate_pawn_targets(Square sq, BitBoard targets, MoveType mt);
+    void generate_target(Square sq, Square target, MoveType mt);
+    template<int Offset> void generate_castling(Square sq);
+};
+
+void MoveGen::generate_target(Square sq, Square target, MoveType mt)
+{
+    moves[count++] = move(sq, target, mt);
+}
+
+void MoveGen::generate_targets(Square sq, BitBoard targets, MoveType mt)
+{
+    while (targets)
+        generate_target(sq, pop(targets), mt);
+}
+
+void MoveGen::generate_pawn_targets(Square sq, BitBoard targets, MoveType mt)
+{
+    if ((sq >> 3) == (position.next == WHITE ? 6 : 1))
+    {
+        generate_targets(sq, targets, static_cast<MoveType>(mt | QUEEN));
+        generate_targets(sq, targets, static_cast<MoveType>(mt | ROOK));
+        generate_targets(sq, targets, static_cast<MoveType>(mt | BISHOP));
+        generate_targets(sq, targets, static_cast<MoveType>(mt | KNIGHT));
+    }
+    else
+        generate_targets(sq, targets, mt);
+}
+
+void MoveGen::generate_targets(Square sq, BitBoard targets)
+{
+    generate_targets(sq, targets & position.color_bb[~position.next], CAPTURE);
+    generate_targets(sq, targets & ~position.all_bb(), {});
+}
+
+template<int Offset> void MoveGen::generate_castling(Square sq)
+{
+    int rank = sq >> 3;
+    Square rook_from = square(Offset < 0 ? 0 : 7, rank);
+    if (!(ray_attack<Offset>(ray[sq][Offset < 0 ? 1 : 5], position.all_bb()) & rook_from))
+        return;
+
+    for (int i = 0; i <= 2; i++)
+    {
+        Square s = square(4 + i * Offset, rank);
+        if (pawn_attack[position.next][s] & position.type_bb[PAWN] & position.color_bb[~position.next])
+            return;
+        if (knight_attack[s] & position.type_bb[KNIGHT] & position.color_bb[~position.next])
+            return;
+        if (bishop_attack(s, position.all_bb()) & position.type_bb[BISHOP] & position.color_bb[~position.next])
+            return;
+        if (rook_attack(s, position.all_bb()) & position.type_bb[ROOK] & position.color_bb[~position.next])
+            return;
+        if (queen_attack(s, position.all_bb()) & position.type_bb[QUEEN] & position.color_bb[~position.next])
+            return;
+        if (king_attack[s] & position.type_bb[KING] & position.color_bb[~position.next])
+            return;
+    }
+
+    generate_target(sq, square(4 + 2 * Offset, rank), CASTLING);
+}
+
+template<PieceType Type> void MoveGen::generate_piece(Square sq)
+{
+    if (Type == PAWN)
+    {
+        generate_pawn_targets(sq, pawn_attack[position.next][sq] & position.color_bb[~position.next], CAPTURE);
+        BitBoard push = pawn_push[position.next][sq] & ~position.all_bb();
+        if (push)
+        {
+            generate_pawn_targets(sq, push, {});
+            generate_targets(sq, pawn_double_push[position.next][sq] & ~position.all_bb(), EN_PASSANT);
+        }
+        if (position.en_passant && (pawn_attack[position.next][sq] & position.en_passant))
+            generate_target(sq, position.en_passant, EN_PASSANT | CAPTURE);
+    }
+    else if (Type == KNIGHT)
+        generate_targets(sq, knight_attack[sq]);
+    else if (Type == BISHOP)
+        generate_targets(sq, bishop_attack(sq, position.all_bb()));
+    else if (Type == ROOK)
+        generate_targets(sq, rook_attack(sq, position.all_bb()));
+    else if (Type == QUEEN)
+        generate_targets(sq, queen_attack(sq, position.all_bb()));
+    else if (Type == KING)
+    {
+        generate_targets(sq, king_attack[sq]);
+        if (position.castling & (WQ << (2 * position.next)))
+            generate_castling<-1>(sq);
+        if (position.castling & (WK << (2 * position.next)))
+            generate_castling<1>(sq);
+    }
+}
+
+template<PieceType Type> void MoveGen::generate_pieces()
+{
+    BitBoard pieces = position.color_bb[position.next] & position.type_bb[Type];
+    while (pieces)
+        generate_piece<Type>(pop(pieces));
+}
+
+void MoveGen::generate()
+{
+    generate_pieces<PAWN>();
+    generate_pieces<KNIGHT>();
+    generate_pieces<BISHOP>();
+    generate_pieces<ROOK>();
+    generate_pieces<QUEEN>();
+    generate_pieces<KING>();
+}
+
+Move MoveGen::next()
+{
+    if (count == 0)
+        generate();
+    if (index >= count)
+        return NULL_MOVE;
+    return moves[index++];
+}
+
+int material(Color c)
+{
+    return 100 * popcount(position.type_bb[PAWN] & position.color_bb[c])
+        + 300 * popcount(position.type_bb[KNIGHT] & position.color_bb[c])
+        + 300 * popcount(position.type_bb[BISHOP] & position.color_bb[c])
+        + 500 * popcount(position.type_bb[ROOK] & position.color_bb[c])
+        + 900 * popcount(position.type_bb[QUEEN] & position.color_bb[c])
+        + 100000 * popcount(position.type_bb[KING] & position.color_bb[c]);
+}
+
+int evaluate()
+{
+    return material(position.next) - material(~position.next);
+}
+
+std::pair<int, Move> search(int ply, int depth, int alpha, int beta)
+{
+    MoveGen gen{};
+    Move best = NULL_MOVE;
+
+    while (Move mv = gen.next())
+    {
+        Memo memo = position.do_move(mv);
+
+        int v;
+        if (depth <= 1)
+            v = -evaluate();
+        else
+            v = -search(ply + 1, depth - 1, -beta, -alpha).first;
+
+        position.undo_move(mv, memo);
+
+        if (v > alpha)
+        {
+            alpha = v;
+            best = mv;
+        }
+        if (alpha > beta)
+            return {beta, mv};
+    }
+
+    return {alpha, best};
+}
+
+void iterate(std::ostream& out, int max_depth, std::clock_t time)
+{
+    std::clock_t start = std::clock();
+
+    Move best{};
+    for (int depth = 1; depth <= max_depth; ++depth)
+    {
+        if (std::clock() - start > time)
+            break;
+
+        auto v = search(0, depth, -32000, 32000);
+        best = v.second;
+        out << "info depth " << depth << " score cp " << v.first << " pv " << v.second << std::endl;
+    }
+    out << "bestmove " << best << std::endl;
 }
 
 const char startfen[] = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -433,6 +753,8 @@ int main()
         }
         else if (token == "isready")
         {
+            if (!king_attack[A1])
+                init_bitboards();
             std::cout << "readyok" << std::endl;
         }
         else if (token == "position")
@@ -456,7 +778,27 @@ int main()
         }
         else if (token == "go")
         {
-            iterate();
+            int max_depth = 128;
+            std::clock_t time = 86400 * CLOCKS_PER_SEC;
+            while (parser >> token)
+            {
+                if (token == "depth")
+                    parser >> max_depth;
+                if (token == (position.next == WHITE ? "wtime" : "btime"))
+                {
+                    long millis;
+                    parser >> millis;
+                    time = millis * CLOCKS_PER_SEC / 1000L / 30L;
+                }
+                if (token == "movetime")
+                {
+                    long millis;
+                    parser >> millis;
+                    time = millis * CLOCKS_PER_SEC / 1000L;
+                }
+            }
+
+            iterate(std::cout, max_depth, time);
         }
         else if (token == "quit")
         {

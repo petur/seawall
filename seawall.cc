@@ -1,6 +1,8 @@
 #include <cassert>
 #include <ctime>
+#include <iomanip>
 #include <iostream>
+#include <limits>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -687,7 +689,56 @@ int evaluate()
     return material(position.next) - material(~position.next);
 }
 
-std::pair<int, Move> search(int ply, int depth, int alpha, int beta)
+struct Search
+{
+    std::istream& in;
+    std::clock_t target_time;
+    std::clock_t max_time;
+    std::clock_t start;
+    long long nodes;
+    bool stopped;
+
+    Search(std::istream& i, std::clock_t time, std::clock_t inc, std::clock_t movetime);
+
+    bool is_stopped(bool max);
+
+    std::pair<int, Move> search(int ply, int depth, int alpha, int beta);
+    void iterate(std::ostream& out, int max_depth);
+};
+
+Search::Search(std::istream& i, std::clock_t time, std::clock_t inc, std::clock_t movetime)
+    : in{i}, target_time{std::numeric_limits<std::clock_t>::max()}, max_time{std::numeric_limits<std::clock_t>::max()},
+    start{std::clock()}, nodes{}, stopped{}
+{
+    if (movetime != -1)
+        target_time = max_time = movetime;
+    else if (time != -1)
+    {
+        int pieces = popcount(position.color_bb[WHITE] | position.color_bb[BLACK]);
+        time -= std::min(time / 8, CLOCKS_PER_SEC / 4);
+        max_time = std::min(time, time / (2 + pieces / 8) + inc);
+        target_time = std::min(max_time, time / (16 + 2 * pieces) + inc / 4);
+    }
+}
+
+bool Search::is_stopped(bool max)
+{
+    if (!stopped && (!max || (nodes & 0xff) == 0))
+    {
+        if (std::clock() - start > (max ? max_time : target_time))
+            stopped = true;
+        else if ((nodes & 0xffff) == 0 && in.rdbuf()->in_avail())
+        {
+            std::string token;
+            in >> token;
+            if (token == "stop")
+                stopped = true;
+        }
+    }
+    return stopped;
+}
+
+std::pair<int, Move> Search::search(int ply, int depth, int alpha, int beta)
 {
     MoveGen gen{};
     Move best = NULL_MOVE;
@@ -697,6 +748,7 @@ std::pair<int, Move> search(int ply, int depth, int alpha, int beta)
 
     while (Move mv = gen.next())
     {
+        ++nodes;
         if (bb(to(mv)) & position.type_bb[KING] & position.color_bb[~position.next])
             return {32767 - ply, mv};
 
@@ -717,6 +769,8 @@ std::pair<int, Move> search(int ply, int depth, int alpha, int beta)
             alpha = v;
             best = mv;
         }
+        if (is_stopped(true))
+            return {alpha, best};
         if (alpha > beta)
             return {beta, mv};
     }
@@ -724,21 +778,24 @@ std::pair<int, Move> search(int ply, int depth, int alpha, int beta)
     return {alpha, best};
 }
 
-void iterate(std::ostream& out, int max_depth, std::clock_t time)
+void Search::iterate(std::ostream& out, int max_depth)
 {
-    std::clock_t start = std::clock();
-
-    Move best{};
+    std::pair<int, Move> best{};
     for (int depth = 1; depth <= max_depth; ++depth)
     {
-        if (std::clock() - start > time)
-            break;
-
         auto v = search(0, depth, -32767, 32767);
-        best = v.second;
-        out << "info depth " << depth << " score cp " << v.first << " pv " << v.second << std::endl;
+        if (!stopped || !best.second)
+            best = v;
+
+        std::clock_t now = std::clock();
+        out << "info depth " << depth << " score cp " << best.first << " nodes " << nodes
+            << std::fixed << std::setprecision(0) << " time " << (static_cast<double>(now - start) * 1000. / CLOCKS_PER_SEC)
+            << " nps " << (nodes * CLOCKS_PER_SEC / static_cast<double>(now - start)) << " pv " << best.second << std::endl;
+
+        if (is_stopped(false))
+            break;
     }
-    out << "bestmove " << best << std::endl;
+    out << "bestmove " << best.second << std::endl;
 }
 
 const char startfen[] = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -747,6 +804,7 @@ bool debug;
 
 int main()
 {
+    std::ios::sync_with_stdio(false);
     std::string line;
 
     while (getline(std::cin, line))
@@ -798,7 +856,10 @@ int main()
         else if (token == "go")
         {
             int max_depth = 128;
-            std::clock_t time = 86400 * CLOCKS_PER_SEC;
+            std::clock_t time = -1;
+            std::clock_t inc = 0;
+            std::clock_t movetime = -1;
+
             while (parser >> token)
             {
                 if (token == "depth")
@@ -807,17 +868,23 @@ int main()
                 {
                     long millis;
                     parser >> millis;
-                    time = millis * CLOCKS_PER_SEC / 1000L / 30L;
+                    time = millis * CLOCKS_PER_SEC / 1000L;
+                }
+                if (token == (position.next == WHITE ? "winc" : "binc"))
+                {
+                    long millis;
+                    parser >> millis;
+                    inc = millis * CLOCKS_PER_SEC / 1000L;
                 }
                 if (token == "movetime")
                 {
                     long millis;
                     parser >> millis;
-                    time = millis * CLOCKS_PER_SEC / 1000L;
+                    movetime = millis * CLOCKS_PER_SEC / 1000L;
                 }
             }
 
-            iterate(std::cout, max_depth, time);
+            Search{std::cin, time, inc, movetime}.iterate(std::cout, max_depth);
         }
         else if (token == "quit")
         {

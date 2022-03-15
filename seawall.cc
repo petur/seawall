@@ -88,9 +88,14 @@ inline BitBoard operator>>(BitBoard lhs, int rhs) { return static_cast<BitBoard>
 inline BitBoard operator~(BitBoard b) { return static_cast<BitBoard>(~static_cast<std::uint64_t>(b)); }
 inline BitBoard operator~(Square sq) { return ~bb(sq); }
 
+inline Square first_square(BitBoard b)
+{
+    return static_cast<Square>(__builtin_ctzll(b));
+}
+
 inline Square pop(BitBoard& b)
 {
-    Square ret = static_cast<Square>(__builtin_ctzll(b));
+    Square ret = first_square(b);
     b &= ~ret;
     return ret;
 }
@@ -531,6 +536,18 @@ BitBoard queen_attack(Square sq, BitBoard blockers)
     return bishop_attack(sq, blockers) | rook_attack(sq, blockers);
 }
 
+BitBoard attackers(Square sq, Color c)
+{
+    return position.color_bb[c] & (
+        (pawn_attack[~c][sq] & position.type_bb[PAWN])
+        | (knight_attack[sq] & position.type_bb[KNIGHT])
+        | (bishop_attack(sq, position.all_bb()) & position.type_bb[BISHOP])
+        | (rook_attack(sq, position.all_bb()) & position.type_bb[ROOK])
+        | (queen_attack(sq, position.all_bb()) & position.type_bb[QUEEN])
+        | (king_attack[sq] & position.type_bb[KING])
+    );
+}
+
 struct MoveGen
 {
     Move moves[256];
@@ -590,17 +607,7 @@ template<int Offset> void MoveGen::generate_castling(Square sq)
     for (int i = 0; i <= 2; i++)
     {
         Square s = square(4 + i * Offset, rank);
-        if (pawn_attack[position.next][s] & position.type_bb[PAWN] & position.color_bb[~position.next])
-            return;
-        if (knight_attack[s] & position.type_bb[KNIGHT] & position.color_bb[~position.next])
-            return;
-        if (bishop_attack(s, position.all_bb()) & position.type_bb[BISHOP] & position.color_bb[~position.next])
-            return;
-        if (rook_attack(s, position.all_bb()) & position.type_bb[ROOK] & position.color_bb[~position.next])
-            return;
-        if (queen_attack(s, position.all_bb()) & position.type_bb[QUEEN] & position.color_bb[~position.next])
-            return;
-        if (king_attack[s] & position.type_bb[KING] & position.color_bb[~position.next])
+        if (attackers(s, ~position.next))
             return;
     }
 
@@ -685,6 +692,9 @@ std::pair<int, Move> search(int ply, int depth, int alpha, int beta)
     MoveGen gen{};
     Move best = NULL_MOVE;
 
+    Square king_sq = first_square(position.type_bb[KING] & position.color_bb[position.next]);
+    BitBoard checkers = attackers(king_sq, ~position.next);
+
     while (Move mv = gen.next())
     {
         if (bb(to(mv)) & position.type_bb[KING] & position.color_bb[~position.next])
@@ -693,7 +703,9 @@ std::pair<int, Move> search(int ply, int depth, int alpha, int beta)
         Memo memo = position.do_move(mv);
 
         int v;
-        if (depth <= 1)
+        if (checkers && attackers(from(mv) == king_sq ? to(mv) : king_sq, position.next))
+            v = -32767 + ply;
+        else if (depth <= 1)
             v = -evaluate();
         else
             v = -search(ply + 1, depth - 1, -beta, -alpha).first;

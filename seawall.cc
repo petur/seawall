@@ -249,13 +249,15 @@ inline Square pop(BitBoard& b)
 
 inline int popcount(BitBoard b) { return __builtin_popcountll(b); }
 
-enum MoveType : std::uint8_t { REGULAR, EN_PASSANT = 6, CASTLING, CAPTURE, INVALID_TYPE = 15 };
+enum MoveType : std::uint8_t { EN_PASSANT = 1, CASTLING = 2, PROMOTION = 4, CAPTURE = 8, INVALID_TYPE = 15 };
 
 inline MoveType& operator|=(MoveType& lhs, MoveType rhs) { return lhs = static_cast<MoveType>(lhs | rhs); }
 inline MoveType& operator&=(MoveType& lhs, MoveType rhs) { return lhs = static_cast<MoveType>(lhs & rhs); }
 inline MoveType operator|(MoveType lhs, MoveType rhs) { return lhs |= rhs; }
 inline MoveType operator&(MoveType lhs, MoveType rhs) { return lhs &= rhs; }
 inline MoveType operator~(MoveType m) { return static_cast<MoveType>(~static_cast<unsigned>(m)); }
+inline PieceType promotion(MoveType m) { return static_cast<PieceType>(1 + (m & 3)); }
+inline MoveType promotion_move(PieceType t) { return static_cast<MoveType>((t - 1) | PROMOTION); }
 
 enum Move : std::uint16_t { NULL_MOVE = 0, INVALID = 0xffff };
 
@@ -267,13 +269,16 @@ inline MoveType type(Move mv) { return static_cast<MoveType>((mv >> 12) & 15); }
 std::ostream& operator<<(std::ostream& out, Move mv)
 {
     out << from(mv) << to(mv);
-    switch (static_cast<PieceType>(type(mv) & ~CAPTURE))
+    if (type(mv) & PROMOTION)
     {
-        case QUEEN: out << 'q'; break;
-        case ROOK: out << 'r'; break;
-        case BISHOP: out << 'b'; break;
-        case KNIGHT: out << 'n'; break;
-        default: break;
+        switch (promotion(type(mv)))
+        {
+            case QUEEN: out << 'q'; break;
+            case ROOK: out << 'r'; break;
+            case BISHOP: out << 'b'; break;
+            case KNIGHT: out << 'n'; break;
+            default: break;
+        }
     }
     return out;
 }
@@ -427,9 +432,8 @@ Memo Position::do_move(Move mv)
     }
     Piece moved = squares[from(mv)];
     clear(from(mv), moved);
-    MoveType promotion = mt & ~CAPTURE;
-    if (promotion && promotion <= static_cast<MoveType>(QUEEN))
-        set(to(mv), next, static_cast<PieceType>(promotion));
+    if (mt & PROMOTION)
+        set(to(mv), next, promotion(mt));
     else
         set(to(mv), moved);
     en_passant = NO_SQUARE;
@@ -582,19 +586,19 @@ Move Position::parse_move(std::string_view s) const
             case 'r': promotion = ROOK; break;
             case 'q': promotion = QUEEN; break;
         }
-        mt = static_cast<MoveType>(promotion);
+        mt = promotion_move(promotion);
     }
     else if (type(squares[from]) == PAWN)
     {
         if (to == en_passant)
-            mt |= EN_PASSANT | CAPTURE;
+            mt = EN_PASSANT | CAPTURE;
         else if (std::abs(from - to) == 16)
-            mt |= EN_PASSANT;
+            mt = EN_PASSANT;
     }
     else if (type(squares[from]) == KING)
     {
         if (std::abs((from & 7) - (to & 7)) > 1)
-            mt |= CASTLING;
+            mt = CASTLING;
     }
 
     if (squares[to])
@@ -808,10 +812,8 @@ void MoveGen::generate_pawn_targets(Square sq, BitBoard targets, MoveType mt)
 {
     if ((sq >> 3) == (position.next == WHITE ? 6 : 1))
     {
-        generate_targets(sq, targets, static_cast<MoveType>(mt | QUEEN));
-        generate_targets(sq, targets, static_cast<MoveType>(mt | ROOK));
-        generate_targets(sq, targets, static_cast<MoveType>(mt | BISHOP));
-        generate_targets(sq, targets, static_cast<MoveType>(mt | KNIGHT));
+        for (PieceType t : {QUEEN, ROOK, BISHOP, KNIGHT})
+            generate_targets(sq, targets, promotion_move(t) | mt);
     }
     else
         generate_targets(sq, targets, mt);

@@ -1186,6 +1186,9 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     {
         ++nodes;
         ++move_count;
+
+        int new_depth = checkers ? depth : depth - 1;
+
         Memo memo = position.do_move(mv);
         stack[ply + 1].key = position.hash();
 
@@ -1199,16 +1202,16 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         {
             v = 0;
         }
-        else if (depth <= 1 && !checkers)
+        else if (new_depth <= 0 && !checkers)
         {
             v = -qsearch(ply + 1, -beta, -alpha);
         }
         else
         {
             if (!pv || alpha > orig_alpha)
-                v = -search(false, ply + 1, depth - 1, -alpha - 1, -alpha).first;
+                v = -search(false, ply + 1, new_depth, -alpha - 1, -alpha).first;
             if (v > alpha && alpha < beta - 1)
-                v = -search(pv, ply + 1, depth - 1, -beta, -alpha).first;
+                v = -search(pv, ply + 1, new_depth, -beta, -alpha).first;
         }
 
         position.undo_move(mv, memo);

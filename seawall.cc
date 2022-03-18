@@ -774,6 +774,39 @@ BitBoard attackers(Square sq, Color c)
     );
 }
 
+struct Stack
+{
+    std::uint64_t key;
+    Move killer_moves[2];
+
+    void save_killer(Move move);
+};
+
+void Stack::save_killer(Move move)
+{
+    if (move != killer_moves[0] && !(type(move) & CAPTURE))
+    {
+        killer_moves[1] = killer_moves[0];
+        killer_moves[0] = move;
+    }
+}
+
+bool repetition(const Stack* stack)
+{
+    std::uint64_t current = stack[0].key;
+    int count = 0;
+    for (int i = 4; i < position.halfmove_clock; i += 2)
+    {
+        if (stack[-i].key == current)
+        {
+            ++count;
+            if (count >= 2)
+                return true;
+        }
+    }
+    return false;
+}
+
 enum MoveGenType { START, CAPTURES, QUIETS, END };
 
 struct MoveGen
@@ -784,14 +817,18 @@ struct MoveGen
     int count;
     int index;
     Move best_move;
+    const Stack& stack;
 
-    explicit MoveGen(MoveGenType w, Move best) : wanted{w}, generated{}, moves{}, count{}, index{}, best_move{best} {}
+    explicit MoveGen(MoveGenType w, Move best, const Stack& st)
+        : wanted{w}, generated{}, moves{}, count{}, index{}, best_move{best}, stack{st} {}
 
     Move next();
 
     void generate();
-    void sort_moves();
-    int rank_move(Move mv) const;
+    void sort_captures();
+    int rank_capture(Move mv) const;
+    void sort_quiets();
+    int rank_quiet(Move mv) const;
     template<PieceType Type> void generate_pieces();
     template<PieceType Type> void generate_piece(Square sq);
     void generate_targets(Square sq, BitBoard targets);
@@ -900,7 +937,7 @@ template<PieceType Type> void MoveGen::generate_pieces()
         generate_piece<Type>(pop(pieces));
 }
 
-int MoveGen::rank_move(Move mv) const
+int MoveGen::rank_capture(Move mv) const
 {
     int rank = 0;
     MoveType mt = type(mv);
@@ -914,12 +951,31 @@ int MoveGen::rank_move(Move mv) const
     return rank;
 }
 
-void MoveGen::sort_moves()
+void MoveGen::sort_captures()
 {
     std::sort(
         &moves[index],
         &moves[count],
-        [this](Move lhs, Move rhs) { return rank_move(lhs) > rank_move(rhs); }
+        [this](Move lhs, Move rhs) { return rank_capture(lhs) > rank_capture(rhs); }
+    );
+}
+
+int MoveGen::rank_quiet(Move mv) const
+{
+    int rank = 0;
+    if (mv == best_move)
+        rank += 8;
+    else if (mv == stack.killer_moves[0] || mv == stack.killer_moves[1])
+        rank += 4;
+    return rank;
+}
+
+void MoveGen::sort_quiets()
+{
+    std::sort(
+        &moves[index],
+        &moves[count],
+        [this](Move lhs, Move rhs) { return rank_quiet(lhs) > rank_quiet(rhs); }
     );
 }
 
@@ -933,7 +989,9 @@ void MoveGen::generate()
     generate_pieces<QUEEN>();
     generate_pieces<KING>();
     if (generated == CAPTURES)
-        sort_moves();
+        sort_captures();
+    else
+        sort_quiets();
 }
 
 Move MoveGen::next()
@@ -988,27 +1046,6 @@ HashEntry* load_hash()
     if (e->key != static_cast<uint16_t>(position.hash() >> 48))
         return nullptr;
     return e;
-}
-
-struct Stack
-{
-    std::uint64_t key;
-};
-
-bool repetition(const Stack* stack)
-{
-    std::uint64_t current = stack[0].key;
-    int count = 0;
-    for (int i = 4; i < position.halfmove_clock; i += 2)
-    {
-        if (stack[-i].key == current)
-        {
-            ++count;
-            if (count >= 2)
-                return true;
-        }
-    }
-    return false;
 }
 
 struct Search
@@ -1082,7 +1119,7 @@ int Search::qsearch(int ply, int alpha, int beta)
     if (e)
         best = e->best_move;
 
-    MoveGen gen{checkers ? QUIETS : CAPTURES, best};
+    MoveGen gen{checkers ? QUIETS : CAPTURES, best, stack[ply]};
 
     while (Move mv = gen.next())
     {
@@ -1130,7 +1167,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         prev_best = he->best_move;
     }
 
-    MoveGen gen{QUIETS, prev_best};
+    MoveGen gen{QUIETS, prev_best, stack[ply]};
     Move best = NULL_MOVE;
     int orig_alpha = alpha;
     Square king_sq = first_square(position.type_bb[KING] & position.color_bb[position.next]);
@@ -1186,6 +1223,8 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         return {checkers ? -32767 + ply : 0, NULL_MOVE};
 
     assert(alpha > -32767);
+    if (alpha >= beta)
+        stack[ply].save_killer(best);
     save_hash(alpha, depth, best, orig_alpha, beta);
     return {alpha, best};
 }

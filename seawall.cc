@@ -284,7 +284,7 @@ std::ostream& operator<<(std::ostream& out, Move mv)
     return out;
 }
 
-constexpr int material[6] = {100, 300, 300, 500, 900, 100000};
+constexpr int material[6] = {100, 320, 350, 500, 1000, 100000};
 constexpr int piece_square_table[6][64] =
 {
     {

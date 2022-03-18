@@ -788,7 +788,14 @@ void Search::iterate(std::ostream& out, int max_depth)
             best = v;
 
         std::clock_t now = std::clock();
-        out << "info depth " << depth << " score cp " << best.first << " nodes " << nodes
+        out << "info depth " << depth << " score ";
+        if (best.first > 32000)
+            out << "mate " << ((32767 - best.first + 1) / 2);
+        else if (best.first < -32000)
+            out << "mate " << ((-32767 - best.first) / 2);
+        else
+            out << "cp " << best.first;
+        out << " nodes " << nodes
             << std::fixed << std::setprecision(0) << " time " << (static_cast<double>(now - start) * 1000. / CLOCKS_PER_SEC)
             << " nps " << (nodes * CLOCKS_PER_SEC / static_cast<double>(now - start)) << " pv " << best.second << std::endl;
 

@@ -1,4 +1,4 @@
-CXXFLAGS = -Wall -Wextra -Werror -std=c++17 -march=native -mtune=native
+CXXFLAGS = -Wall -Wextra -Werror -std=c++17 -O3 -march=native -mtune=native
 branch := $(shell git branch --show-current)
 release := out/seawall.$(branch)
 

@@ -455,6 +455,7 @@ void Position::parse(std::istream& fen)
                 case 'r': p = BROOK; break;
                 case 'q': p = BQUEEN; break;
                 case 'k': p = BKING; break;
+                default: p = NONE; break;
             }
             set(sq++, p);
         }

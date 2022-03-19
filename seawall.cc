@@ -1225,7 +1225,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     int move_count = 0;
     while (Move mv = gen.next())
     {
-        if (!checkers && move_count && depth <= 2 && eval < alpha - 100 && !(type(mv) & (CAPTURE | PROMOTION)))
+        if (!checkers && move_count && depth <= 5 && eval < alpha - (depth * 300 - 200) && !(type(mv) & (CAPTURE | PROMOTION)))
             continue;
 
         int new_depth = checkers ? depth : depth - 1;

@@ -949,10 +949,17 @@ int evaluate()
     return position.piece_square_values[position.next] - position.piece_square_values[~position.next];
 }
 
+enum HashFlags : std::uint8_t { LOWER = 1 << 0, UPPER = 1 << 1 };
+
+inline HashFlags& operator|=(HashFlags& lhs, HashFlags rhs) { return lhs = static_cast<HashFlags>(lhs | rhs); }
+
 struct HashEntry
 {
     std::uint16_t key;
+    std::int16_t value;
     Move best_move;
+    std::int8_t depth;
+    HashFlags flags;
 };
 
 HashEntry* hash_table;
@@ -963,9 +970,15 @@ std::size_t hash_index(const Position& position)
     return ((position.hash() & 0xffffffffULL) * hash_size) >> 32;
 }
 
-void save_hash(Move mv)
+void save_hash(int value, int depth, Move mv, int alpha, int beta)
 {
-    hash_table[hash_index(position)] = HashEntry{static_cast<uint16_t>(position.hash() >> 48), mv};
+    HashFlags flags{};
+    if (value > alpha)
+        flags |= LOWER;
+    if (value < beta)
+        flags |= UPPER;
+    hash_table[hash_index(position)] =
+        HashEntry{static_cast<std::uint16_t>(position.hash() >> 48), static_cast<std::int16_t>(value), mv, static_cast<std::int8_t>(depth), flags};
 }
 
 HashEntry* load_hash()
@@ -1012,7 +1025,7 @@ struct Search
     bool is_stopped(bool max);
 
     int qsearch(int ply, int alpha, int beta);
-    std::pair<int, Move> search(int ply, int depth, int alpha, int beta);
+    std::pair<int, Move> search(bool pv, int ply, int depth, int alpha, int beta);
     void iterate(std::ostream& out, int max_depth);
 };
 
@@ -1050,6 +1063,8 @@ bool Search::is_stopped(bool max)
 
 int Search::qsearch(int ply, int alpha, int beta)
 {
+    int orig_alpha = alpha;
+
     Square king_sq = first_square(position.type_bb[KING] & position.color_bb[position.next]);
     BitBoard checkers = attackers(king_sq, ~position.next);
 
@@ -1093,16 +1108,29 @@ int Search::qsearch(int ply, int alpha, int beta)
             break;
     }
 
-    save_hash(best);
+    save_hash(alpha, 0, best, orig_alpha, beta);
     return alpha;
 }
 
-std::pair<int, Move> Search::search(int ply, int depth, int alpha, int beta)
+std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int beta)
 {
+    Move prev_best = NULL_MOVE;
     HashEntry* he = load_hash();
-    MoveGen gen{QUIETS, he ? he->best_move : NULL_MOVE};
-    Move best = NULL_MOVE;
+    if (he)
+    {
+        if (!pv && he->depth >= depth && he->value && he->value > -32000 && he->value < 32000)
+        {
+            if (he->value >= beta && (he->flags & LOWER))
+                return {beta, he->best_move};
+            if (he->value <= alpha && (he->flags & UPPER))
+                return {alpha, he->best_move};
+        }
+        prev_best = he->best_move;
+    }
 
+    MoveGen gen{QUIETS, prev_best};
+    Move best = NULL_MOVE;
+    int orig_alpha = alpha;
     Square king_sq = first_square(position.type_bb[KING] & position.color_bb[position.next]);
     BitBoard checkers = attackers(king_sq, ~position.next);
 
@@ -1129,7 +1157,7 @@ std::pair<int, Move> Search::search(int ply, int depth, int alpha, int beta)
             v = -qsearch(ply + 1, -beta, -alpha);
         }
         else
-            v = -search(ply + 1, depth - 1, -beta, -alpha).first;
+            v = -search(pv && alpha == orig_alpha, ply + 1, depth - 1, -beta, -alpha).first;
 
         position.undo_move(mv, memo);
 
@@ -1151,7 +1179,7 @@ std::pair<int, Move> Search::search(int ply, int depth, int alpha, int beta)
         return {checkers ? -32767 + ply : 0, NULL_MOVE};
 
     assert(alpha > -32767);
-    save_hash(best);
+    save_hash(alpha, depth, best, orig_alpha, beta);
     return {alpha, best};
 }
 
@@ -1160,7 +1188,7 @@ void Search::iterate(std::ostream& out, int max_depth)
     std::pair<int, Move> best{};
     for (int depth = 1; depth <= max_depth; ++depth)
     {
-        auto v = search(0, depth, -32767, 32767);
+        auto v = search(true, 0, depth, -32767, 32767);
         if (!stopped || !best.second)
             best = v;
 

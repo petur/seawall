@@ -1144,7 +1144,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         Memo memo = position.do_move(mv);
         stack[ply + 1].key = position.hash();
 
-        int v;
+        int v = beta;
         if (attackers(from(mv) == king_sq ? to(mv) : king_sq, position.next))
         {
             v = -32767;
@@ -1159,7 +1159,12 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
             v = -qsearch(ply + 1, -beta, -alpha);
         }
         else
-            v = -search(pv && alpha == orig_alpha, ply + 1, depth - 1, -beta, -alpha).first;
+        {
+            if (!pv || alpha > orig_alpha)
+                v = -search(false, ply + 1, depth - 1, -alpha - 1, -alpha).first;
+            if (v > alpha && alpha < beta - 1)
+                v = -search(pv, ply + 1, depth - 1, -beta, -alpha).first;
+        }
 
         position.undo_move(mv, memo);
 

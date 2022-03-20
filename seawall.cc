@@ -984,6 +984,7 @@ struct Search
 
     bool is_stopped(bool max);
 
+    int qsearch(int ply, int alpha, int beta);
     std::pair<int, Move> search(int ply, int depth, int alpha, int beta);
     void iterate(std::ostream& out, int max_depth);
 };
@@ -1020,6 +1021,55 @@ bool Search::is_stopped(bool max)
     return stopped;
 }
 
+int Search::qsearch(int ply, int alpha, int beta)
+{
+    Square king_sq = first_square(position.type_bb[KING] & position.color_bb[position.next]);
+    BitBoard checkers = attackers(king_sq, ~position.next);
+
+    int pat = checkers ? -32767 + ply : evaluate();
+    if (pat >= beta)
+        return beta;
+    if (pat > alpha)
+        alpha = pat;
+
+    Move best = NULL_MOVE;
+
+    HashEntry* e = load_hash();
+    if (e)
+        best = e->best_move;
+
+    MoveGen gen{checkers ? QUIETS : CAPTURES, best};
+
+    while (Move mv = gen.next())
+    {
+        if (is_stopped(true))
+            return alpha;
+
+        if (!checkers && !(type(mv) & PROMOTION) && material[type(position.squares[to(mv)])] < alpha - 70)
+            continue;
+
+        ++nodes;
+        Memo memo = position.do_move(mv);
+        int v;
+        if (attackers(from(mv) == king_sq ? to(mv) : king_sq, position.next))
+            v = -32767;
+        else
+            v = -qsearch(ply + 1, -beta, -alpha);
+        position.undo_move(mv, memo);
+
+        if (v > alpha)
+        {
+            alpha = v;
+            best = mv;
+        }
+        if (alpha >= beta)
+            break;
+    }
+
+    save_hash(best);
+    return alpha;
+}
+
 std::pair<int, Move> Search::search(int ply, int depth, int alpha, int beta)
 {
     HashEntry* he = load_hash();
@@ -1027,6 +1077,7 @@ std::pair<int, Move> Search::search(int ply, int depth, int alpha, int beta)
     Move best = NULL_MOVE;
 
     Square king_sq = first_square(position.type_bb[KING] & position.color_bb[position.next]);
+    BitBoard checkers = attackers(king_sq, ~position.next);
 
     int move_count = 0;
     while (Move mv = gen.next())
@@ -1046,9 +1097,9 @@ std::pair<int, Move> Search::search(int ply, int depth, int alpha, int beta)
         {
             v = 0;
         }
-        else if (depth <= 1)
+        else if (depth <= 1 && !checkers)
         {
-            v = -evaluate();
+            v = -qsearch(ply + 1, -beta, -alpha);
         }
         else
             v = -search(ply + 1, depth - 1, -beta, -alpha).first;
@@ -1070,7 +1121,7 @@ std::pair<int, Move> Search::search(int ply, int depth, int alpha, int beta)
     }
 
     if (move_count == 0)
-        return {attackers(king_sq, ~position.next) ? -32767 + ply : 0, NULL_MOVE};
+        return {checkers ? -32767 + ply : 0, NULL_MOVE};
 
     assert(alpha > -32767);
     save_hash(best);

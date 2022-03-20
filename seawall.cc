@@ -278,6 +278,8 @@ std::ostream& operator<<(std::ostream& out, Move mv)
     return out;
 }
 
+constexpr int material[6] = {100, 300, 300, 500, 900, 100000};
+
 struct Memo
 {
     Piece moved;
@@ -314,6 +316,7 @@ struct Position
     Square en_passant;
     int halfmove_clock;
     std::uint64_t piece_hash;
+    int material_values[2];
 } position;
 
 void Position::clear(Square sq, Color c, PieceType t)
@@ -322,6 +325,7 @@ void Position::clear(Square sq, Color c, PieceType t)
     type_bb[t] &= ~sq;
     squares[sq] = NONE;
     piece_hash ^= piece_hash_values[sq | 64 * c | 128 * t];
+    material_values[c] -= material[t];
 }
 
 void Position::set(Square sq, Color c, PieceType t, Piece p)
@@ -331,6 +335,7 @@ void Position::set(Square sq, Color c, PieceType t, Piece p)
     type_bb[t] |= sq;
     squares[sq] = p;
     piece_hash ^= piece_hash_values[sq | 64 * c | 128 * t];
+    material_values[c] += material[t];
 }
 
 Memo Position::do_move(Move mv)
@@ -430,6 +435,8 @@ void Position::parse(std::istream& fen)
         b = EMPTY;
     for (Piece& p : squares)
         p = NONE;
+    for (int& v : material_values)
+        v = 0;
     Square sq = H1;
 
     for (char ch : token)
@@ -822,19 +829,9 @@ Move MoveGen::next()
     return moves[index++];
 }
 
-int material(Color c)
-{
-    return 100 * popcount(position.type_bb[PAWN] & position.color_bb[c])
-        + 300 * popcount(position.type_bb[KNIGHT] & position.color_bb[c])
-        + 300 * popcount(position.type_bb[BISHOP] & position.color_bb[c])
-        + 500 * popcount(position.type_bb[ROOK] & position.color_bb[c])
-        + 900 * popcount(position.type_bb[QUEEN] & position.color_bb[c])
-        + 100000 * popcount(position.type_bb[KING] & position.color_bb[c]);
-}
-
 int evaluate()
 {
-    return material(position.next) - material(~position.next);
+    return position.material_values[position.next] - position.material_values[~position.next];
 }
 
 struct HashEntry

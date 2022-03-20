@@ -744,21 +744,24 @@ std::pair<int, Move> Search::search(int ply, int depth, int alpha, int beta)
     Move best = NULL_MOVE;
 
     Square king_sq = first_square(position.type_bb[KING] & position.color_bb[position.next]);
-    BitBoard checkers = attackers(king_sq, ~position.next);
 
+    int move_count = 0;
     while (Move mv = gen.next())
     {
         ++nodes;
-        if (bb(to(mv)) & position.type_bb[KING] & position.color_bb[~position.next])
-            return {32767 - ply, mv};
-
+        ++move_count;
         Memo memo = position.do_move(mv);
 
         int v;
-        if (checkers && attackers(from(mv) == king_sq ? to(mv) : king_sq, position.next))
-            v = -32767 + ply;
+        if (attackers(from(mv) == king_sq ? to(mv) : king_sq, position.next))
+        {
+            v = -32767;
+            --move_count;
+        }
         else if (depth <= 1)
+        {
             v = -evaluate();
+        }
         else
             v = -search(ply + 1, depth - 1, -beta, -alpha).first;
 
@@ -774,6 +777,9 @@ std::pair<int, Move> Search::search(int ply, int depth, int alpha, int beta)
         if (alpha > beta)
             return {beta, mv};
     }
+
+    if (move_count == 0)
+        return {attackers(king_sq, ~position.next) ? -32767 + ply : 0, NULL_MOVE};
 
     return {alpha, best};
 }

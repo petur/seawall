@@ -14,6 +14,7 @@ info string fen rnbqk2r/pppp1ppp/3b1n2/4p3/4P3/3B1N2/PPPP1PPP/RNBQ1K1R b kq - 5 
 info string fen rnbqk2r/pppp1ppp/3b1n2/4p3/4P3/3B1N2/PPPP1PPP/RNBQKR2 b Qkq - 5 1
 info string fen R3k2r/8/8/8/8/8/8/4K2R b Kk - 0 1
 info string fen rnbqkbnr/pp2pppp/3P4/2p5/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1
+info string fen Q6k/8/8/8/8/8/8/7K b - - 0 1
 EOF
     ) \
     <(./seawall <<EOF
@@ -29,6 +30,7 @@ position startpos moves e2e4 e7e5 g1f3 g8f6 f1d3 f8d6 e1f1
 position startpos moves e2e4 e7e5 g1f3 g8f6 f1d3 f8d6 h1f1
 position fen r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1 moves a1a8
 position startpos moves e2e4 c7c5 e4e5 d7d5 e5d6
+position fen 7k/P7/8/8/8/8/8/7K w - - 0 1 moves a7a8q
 quit
 EOF
     )

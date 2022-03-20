@@ -77,7 +77,9 @@ inline BitBoard operator~(Square sq) { return static_cast<BitBoard>(~(1ULL << sq
 enum MoveType : std::uint8_t { REGULAR, EN_PASSANT = 6, CASTLING, CAPTURE, INVALID_TYPE = 15 };
 
 inline MoveType& operator|=(MoveType& lhs, MoveType rhs) { return lhs = static_cast<MoveType>(lhs | rhs); }
+inline MoveType& operator&=(MoveType& lhs, MoveType rhs) { return lhs = static_cast<MoveType>(lhs & rhs); }
 inline MoveType operator|(MoveType lhs, MoveType rhs) { return lhs |= rhs; }
+inline MoveType operator~(MoveType m) { return static_cast<MoveType>(~static_cast<unsigned>(m)); }
 
 enum Move : std::uint16_t { NULL_MOVE = 0, INVALID = 0xffff };
 
@@ -117,10 +119,12 @@ Memo Position::do_move(Move mv)
     Memo memo{squares[to(mv)], castling, en_passant, halfmove_clock};
     ++halfmove_clock;
 
-    if (type(mv) & CAPTURE)
+    MoveType mt = type(mv);
+    if (mt & CAPTURE)
     {
+        mt &= ~CAPTURE;
         Square cap_sq = to(mv);
-        if (type(mv) & EN_PASSANT)
+        if (mt == EN_PASSANT)
         {
             cap_sq = static_cast<Square>(cap_sq + rank_fwd(~next));
             memo.captured = squares[cap_sq];
@@ -135,18 +139,26 @@ Memo Position::do_move(Move mv)
     color_bb[color(moved)] &= ~from(mv);
     type_bb[type(moved)] &= ~from(mv);
     color_bb[color(moved)] |= to(mv);
-    type_bb[type(moved)] |= to(mv);
     squares[from(mv)] = NONE;
-    squares[to(mv)] = moved;
+    if (mt && mt <= static_cast<MoveType>(QUEEN))
+    {
+        type_bb[mt] |= to(mv);
+        squares[to(mv)] = static_cast<Piece>(mt | (next == WHITE ? 8 : 16));
+    }
+    else
+    {
+        type_bb[type(moved)] |= to(mv);
+        squares[to(mv)] = moved;
+    }
     en_passant = NO_SQUARE;
 
     if (type(moved) == PAWN)
     {
         halfmove_clock = 0;
-        if ((type(mv) & EN_PASSANT) && !(type(mv) & CAPTURE))
+        if (mt == EN_PASSANT && !(type(mv) & CAPTURE))
             en_passant = static_cast<Square>(from(mv) + rank_fwd(next));
     }
-    else if (type(mv) & CASTLING)
+    else if (mt == CASTLING)
     {
         int rank = from(mv) & ~7;
         Square rook_from = static_cast<Square>(rank | (to(mv) < from(mv) ? 0 : 7));

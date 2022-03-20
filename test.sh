@@ -6,6 +6,7 @@ diff -u --color \
     <(cat <<EOF
 id name seawall
 id author petur
+option name Hash type spin default 1 min 1 max 65536
 uciok
 readyok
 info string fen rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1

@@ -1219,6 +1219,7 @@ int main()
 {
     std::ios::sync_with_stdio(false);
     std::string line;
+    std::size_t hash_mb = 1;
     bool debug = false;
     Stack stack[256] = {};
 
@@ -1233,6 +1234,7 @@ int main()
             std::cout
                 << "id name seawall\n"
                 << "id author petur\n"
+                << "option name Hash type spin default 1 min 1 max 65536\n"
                 << "uciok" << std::endl;
         }
         else if (token == "debug")
@@ -1243,13 +1245,27 @@ int main()
             else if (token == "off")
                 debug = false;
         }
+        else if (token == "setoption")
+        {
+            parser >> token;
+            parser >> token;
+            for (char& c : token)
+                c = std::tolower(static_cast<unsigned char>(c));
+            if (token == "hash")
+            {
+                parser >> token;
+                parser >> hash_mb;
+            }
+        }
         else if (token == "isready")
         {
             if (!king_attack[A1])
                 init_bitboards();
-            if (!hash_table)
+            std::size_t new_hash_size = (hash_mb << 20) / sizeof(HashEntry);
+            if (new_hash_size != hash_size)
             {
-                hash_size = (1 << 20) / sizeof(HashEntry);
+                delete[] hash_table;
+                hash_size = new_hash_size;
                 hash_table = new HashEntry[hash_size];
                 std::fill_n(hash_table, hash_size, HashEntry{});
             }

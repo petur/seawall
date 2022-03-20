@@ -1180,10 +1180,14 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     int orig_alpha = alpha;
     Square king_sq = first_square(position.type_bb[KING] & position.color_bb[position.next]);
     BitBoard checkers = attackers(king_sq, ~position.next);
+    int eval = evaluate();
 
     int move_count = 0;
     while (Move mv = gen.next())
     {
+        if (!checkers && move_count && depth <= 2 && eval < alpha - 100 && !(type(mv) & (CAPTURE | PROMOTION)))
+            continue;
+
         ++nodes;
         ++move_count;
 

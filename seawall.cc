@@ -807,7 +807,7 @@ bool repetition(const Stack* stack)
     return false;
 }
 
-enum MoveGenType { START, CAPTURES, QUIETS, END };
+enum MoveGenType { START, BEST, CAPTURES, QUIETS, END };
 
 struct MoveGen
 {
@@ -829,9 +829,9 @@ struct MoveGen
     int rank_capture(Move mv) const;
     void sort_quiets();
     int rank_quiet(Move mv) const;
-    template<PieceType Type> void generate_pieces();
-    template<PieceType Type> void generate_piece(Square sq);
-    void generate_targets(Square sq, BitBoard targets);
+    template<PieceType Type> void generate_pieces(MoveGenType gen, BitBoard from_mask, BitBoard to_mask);
+    template<PieceType Type> void generate_piece(MoveGenType gen, Square sq, BitBoard to_mask);
+    void generate_targets(MoveGenType gen, Square sq, BitBoard targets);
     void generate_targets(Square sq, BitBoard targets, MoveType mt);
     void generate_pawn_targets(Square sq, BitBoard targets, MoveType mt);
     void generate_target(Square sq, Square target, MoveType mt);
@@ -841,10 +841,9 @@ struct MoveGen
 void MoveGen::generate_target(Square sq, Square target, MoveType mt)
 {
     assert(!(target & ~63));
-    moves[count] = move(sq, target, mt);
-    if (moves[count] == best_move && count > index)
-        std::swap(moves[count], moves[index]);
-    count++;
+    Move mv = move(sq, target, mt);
+    if (generated == BEST || mv != best_move)
+        moves[count++] = mv;
 }
 
 void MoveGen::generate_targets(Square sq, BitBoard targets, MoveType mt)
@@ -864,11 +863,11 @@ void MoveGen::generate_pawn_targets(Square sq, BitBoard targets, MoveType mt)
         generate_targets(sq, targets, mt);
 }
 
-void MoveGen::generate_targets(Square sq, BitBoard targets)
+void MoveGen::generate_targets(MoveGenType gen, Square sq, BitBoard targets)
 {
-    if (generated == CAPTURES)
+    if (gen == CAPTURES)
         generate_targets(sq, targets & position.color_bb[~position.next], CAPTURE);
-    if (generated == QUIETS)
+    if (gen == QUIETS)
         generate_targets(sq, targets & ~position.all_bb(), {});
 }
 
@@ -889,38 +888,38 @@ template<int Offset> void MoveGen::generate_castling(Square sq)
     generate_target(sq, square(4 + 2 * Offset, rank), CASTLING);
 }
 
-template<PieceType Type> void MoveGen::generate_piece(Square sq)
+template<PieceType Type> void MoveGen::generate_piece(MoveGenType gen, Square sq, BitBoard to_mask)
 {
     if (Type == PAWN)
     {
-        if (generated == CAPTURES)
+        if (gen == CAPTURES)
         {
-            generate_pawn_targets(sq, pawn_attack[position.next][sq] & position.color_bb[~position.next], CAPTURE);
-            if (position.en_passant != NO_SQUARE && (pawn_attack[position.next][sq] & position.en_passant))
+            generate_pawn_targets(sq, pawn_attack[position.next][sq] & position.color_bb[~position.next] & to_mask, CAPTURE);
+            if (position.en_passant != NO_SQUARE && (pawn_attack[position.next][sq] & position.en_passant & to_mask))
                 generate_target(sq, position.en_passant, EN_PASSANT | CAPTURE);
         }
-        if (generated == QUIETS)
+        if (gen == QUIETS)
         {
             BitBoard push = pawn_push[position.next][sq] & ~position.all_bb();
             if (push)
             {
-                generate_pawn_targets(sq, push, {});
-                generate_targets(sq, pawn_double_push[position.next][sq] & ~position.all_bb(), EN_PASSANT);
+                generate_pawn_targets(sq, push & to_mask, {});
+                generate_targets(sq, pawn_double_push[position.next][sq] & ~position.all_bb() & to_mask, EN_PASSANT);
             }
         }
     }
     else if (Type == KNIGHT)
-        generate_targets(sq, knight_attack[sq]);
+        generate_targets(gen, sq, knight_attack[sq] & to_mask);
     else if (Type == BISHOP)
-        generate_targets(sq, bishop_attack(sq, position.all_bb()));
+        generate_targets(gen, sq, bishop_attack(sq, position.all_bb()) & to_mask);
     else if (Type == ROOK)
-        generate_targets(sq, rook_attack(sq, position.all_bb()));
+        generate_targets(gen, sq, rook_attack(sq, position.all_bb()) & to_mask);
     else if (Type == QUEEN)
-        generate_targets(sq, queen_attack(sq, position.all_bb()));
+        generate_targets(gen, sq, queen_attack(sq, position.all_bb()) & to_mask);
     else if (Type == KING)
     {
-        generate_targets(sq, king_attack[sq]);
-        if (generated == QUIETS)
+        generate_targets(gen, sq, king_attack[sq] & to_mask);
+        if (gen == QUIETS && (to_mask & ~king_attack[sq]))
         {
             if (position.castling & (WQ << (2 * position.next)))
                 generate_castling<-1>(sq);
@@ -930,11 +929,11 @@ template<PieceType Type> void MoveGen::generate_piece(Square sq)
     }
 }
 
-template<PieceType Type> void MoveGen::generate_pieces()
+template<PieceType Type> void MoveGen::generate_pieces(MoveGenType gen, BitBoard from_mask, BitBoard to_mask)
 {
-    BitBoard pieces = position.color_bb[position.next] & position.type_bb[Type];
+    BitBoard pieces = position.color_bb[position.next] & position.type_bb[Type] & from_mask;
     while (pieces)
-        generate_piece<Type>(pop(pieces));
+        generate_piece<Type>(gen, pop(pieces), to_mask);
 }
 
 int MoveGen::rank_capture(Move mv) const
@@ -946,8 +945,6 @@ int MoveGen::rank_capture(Move mv) const
         rank += 7 - type(position.squares[from(mv)]);
         rank += 8 * type(position.squares[to(mv)]);
     }
-    if (mv == best_move)
-        rank += 64;
     return rank;
 }
 
@@ -963,9 +960,7 @@ void MoveGen::sort_captures()
 int MoveGen::rank_quiet(Move mv) const
 {
     int rank = 0;
-    if (mv == best_move)
-        rank += 8;
-    else if (mv == stack.killer_moves[0] || mv == stack.killer_moves[1])
+    if (mv == stack.killer_moves[0] || mv == stack.killer_moves[1])
         rank += 4;
     return rank;
 }
@@ -982,15 +977,28 @@ void MoveGen::sort_quiets()
 void MoveGen::generate()
 {
     generated = static_cast<MoveGenType>(generated + 1);
-    generate_pieces<PAWN>();
-    generate_pieces<KNIGHT>();
-    generate_pieces<BISHOP>();
-    generate_pieces<ROOK>();
-    generate_pieces<QUEEN>();
-    generate_pieces<KING>();
+    MoveGenType gen = generated;
+    BitBoard from_mask = ALL;
+    BitBoard to_mask = ALL;
+    if (generated == BEST)
+    {
+        if (!best_move)
+            return;
+        gen = type(best_move) & CAPTURE ? CAPTURES : QUIETS;
+        if (gen > wanted)
+            return;
+        from_mask = bb(from(best_move));
+        to_mask = bb(to(best_move));
+    }
+    generate_pieces<PAWN>(gen, from_mask, to_mask);
+    generate_pieces<KNIGHT>(gen, from_mask, to_mask);
+    generate_pieces<BISHOP>(gen, from_mask, to_mask);
+    generate_pieces<ROOK>(gen, from_mask, to_mask);
+    generate_pieces<QUEEN>(gen, from_mask, to_mask);
+    generate_pieces<KING>(gen, from_mask, to_mask);
     if (generated == CAPTURES)
         sort_captures();
-    else
+    else if (generated == QUIETS)
         sort_quiets();
 }
 

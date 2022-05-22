@@ -1182,6 +1182,9 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     BitBoard checkers = attackers(king_sq, ~position.next);
     int eval = evaluate();
 
+    if (!pv && !checkers && depth <= 1 && eval > beta + 100)
+        return {beta, NULL_MOVE};
+
     int move_count = 0;
     while (Move mv = gen.next())
     {

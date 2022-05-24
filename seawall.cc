@@ -1298,15 +1298,13 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         return {checkers ? -32767 + ply : 0, NULL_MOVE};
 
     assert(alpha > -32767);
-    if (!(type(best) & CAPTURE))
+    if (!(type(best) & CAPTURE) && alpha >= beta)
     {
-        if (alpha >= beta)
-            stack[ply].save_killer(best);
+        stack[ply].save_killer(best);
         if (depth > 1)
         {
             MoveHistory* hist = history[position.next];
-            if (alpha >= beta)
-                hist[best & FROM_TO_MASK].cuts++;
+            hist[best & FROM_TO_MASK].cuts++;
             for (int i = gen.index - 1; i >= 0; --i)
             {
                 if (type(gen.moves[i]) & CAPTURE)

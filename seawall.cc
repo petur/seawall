@@ -864,6 +864,27 @@ HashEntry* load_hash()
     return e;
 }
 
+struct Stack
+{
+    std::uint64_t key;
+};
+
+bool repetition(const Stack* stack)
+{
+    std::uint64_t current = stack[0].key;
+    int count = 0;
+    for (int i = 4; i < position.halfmove_clock; i += 2)
+    {
+        if (stack[-i].key == current)
+        {
+            ++count;
+            if (count >= 2)
+                return true;
+        }
+    }
+    return false;
+}
+
 struct Search
 {
     std::istream& in;
@@ -872,8 +893,9 @@ struct Search
     std::clock_t start;
     long long nodes;
     bool stopped;
+    Stack* stack;
 
-    Search(std::istream& i, std::clock_t time, std::clock_t inc, std::clock_t movetime);
+    Search(std::istream& i, std::clock_t time, std::clock_t inc, std::clock_t movetime, Stack* stack);
 
     bool is_stopped(bool max);
 
@@ -881,9 +903,9 @@ struct Search
     void iterate(std::ostream& out, int max_depth);
 };
 
-Search::Search(std::istream& i, std::clock_t time, std::clock_t inc, std::clock_t movetime)
+Search::Search(std::istream& i, std::clock_t time, std::clock_t inc, std::clock_t movetime, Stack* st)
     : in{i}, target_time{std::numeric_limits<std::clock_t>::max()}, max_time{std::numeric_limits<std::clock_t>::max()},
-    start{std::clock()}, nodes{}, stopped{}
+    start{std::clock()}, nodes{}, stopped{}, stack{st}
 {
     if (movetime != -1)
         target_time = max_time = movetime;
@@ -927,12 +949,17 @@ std::pair<int, Move> Search::search(int ply, int depth, int alpha, int beta)
         ++nodes;
         ++move_count;
         Memo memo = position.do_move(mv);
+        stack[ply + 1].key = position.hash();
 
         int v;
         if (attackers(from(mv) == king_sq ? to(mv) : king_sq, position.next))
         {
             v = -32767;
             --move_count;
+        }
+        else if (repetition(&stack[ply + 1]))
+        {
+            v = 0;
         }
         else if (depth <= 1)
         {
@@ -994,12 +1021,12 @@ void Search::iterate(std::ostream& out, int max_depth)
 
 const char startfen[] = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
-bool debug;
-
 int main()
 {
     std::ios::sync_with_stdio(false);
     std::string line;
+    bool debug = false;
+    Stack stack[256] = {};
 
     while (getline(std::cin, line))
     {
@@ -1044,11 +1071,14 @@ int main()
             }
             else
                 position.parse(parser);
+            std::fill_n(stack, position.halfmove_clock, Stack{});
+            stack[position.halfmove_clock].key = position.hash();
 
             parser >> token;
             while (parser >> token)
             {
                 position.do_move(position.parse_move(token));
+                stack[position.halfmove_clock].key = position.hash();
             }
             if (debug)
                 position.debug(std::cout);
@@ -1084,7 +1114,7 @@ int main()
                 }
             }
 
-            Search{std::cin, time, inc, movetime}.iterate(std::cout, max_depth);
+            Search{std::cin, time, inc, movetime, &stack[position.halfmove_clock]}.iterate(std::cout, max_depth);
         }
         else if (token == "quit")
         {

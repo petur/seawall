@@ -1,3 +1,4 @@
+#include <cassert>
 #include <ctime>
 #include <iostream>
 #include <sstream>
@@ -126,6 +127,7 @@ std::ostream& operator<<(std::ostream& out, Move mv)
 struct Memo
 {
     Piece captured;
+    bool promoted;
     Castling castling;
     Square en_passant;
     int halfmove_clock;
@@ -154,7 +156,7 @@ struct Position
 
 Memo Position::do_move(Move mv)
 {
-    Memo memo{squares[to(mv)], castling, en_passant, halfmove_clock};
+    Memo memo{squares[to(mv)], false, castling, en_passant, halfmove_clock};
     ++halfmove_clock;
 
     MoveType mt = type(mv);
@@ -180,6 +182,7 @@ Memo Position::do_move(Move mv)
     squares[from(mv)] = NONE;
     if (mt && mt <= static_cast<MoveType>(QUEEN))
     {
+        memo.promoted = true;
         type_bb[mt] |= to(mv);
         squares[to(mv)] = static_cast<Piece>(mt | (next == WHITE ? 8 : 16));
     }
@@ -234,9 +237,9 @@ void Position::undo_move(Move mv, const Memo& memo)
     color_bb[color(moved)] &= ~to(mv);
     type_bb[type(moved)] &= ~to(mv);
     color_bb[color(moved)] |= from(mv);
-    type_bb[type(moved)] |= from(mv);
+    type_bb[memo.promoted ? PAWN : type(moved)] |= from(mv);
     squares[to(mv)] = NONE;
-    squares[from(mv)] = moved;
+    squares[from(mv)] = memo.promoted ? static_cast<Piece>(PAWN | (next == WHITE ? 8 : 16)) : moved;
 
     MoveType mt = type(mv);
     if (mt & CAPTURE)
@@ -548,6 +551,7 @@ struct MoveGen
 
 void MoveGen::generate_target(Square sq, Square target, MoveType mt)
 {
+    assert(!(target & ~63));
     moves[count++] = move(sq, target, mt);
 }
 
@@ -614,7 +618,7 @@ template<PieceType Type> void MoveGen::generate_piece(Square sq)
             generate_pawn_targets(sq, push, {});
             generate_targets(sq, pawn_double_push[position.next][sq] & ~position.all_bb(), EN_PASSANT);
         }
-        if (position.en_passant && (pawn_attack[position.next][sq] & position.en_passant))
+        if (position.en_passant != NO_SQUARE && (pawn_attack[position.next][sq] & position.en_passant))
             generate_target(sq, position.en_passant, EN_PASSANT | CAPTURE);
     }
     else if (Type == KNIGHT)

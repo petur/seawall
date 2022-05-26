@@ -23,6 +23,7 @@ enum Piece : std::uint8_t
 
 inline Color color(Piece p) { return static_cast<Color>(p >> 4); }
 inline PieceType type(Piece p) { return static_cast<PieceType>(p & 7); }
+inline Piece piece(Color c, PieceType t) { return static_cast<Piece>((c == WHITE ? 1 << 3 : 1 << 4) | t); }
 
 enum Castling : std::uint8_t { WQ = 1 << 0, WK = 1 << 1, BQ = 1 << 2, BK = 1 << 3 };
 
@@ -50,6 +51,7 @@ std::ostream& operator<<(std::ostream& out, Castling c)
 
 enum Square : std::uint8_t { A1 = 0, H1 = 56, H8 = 63, NO_SQUARE = 0xff };
 
+inline Square& operator+=(Square& lhs, int rhs) { return lhs = static_cast<Square>(lhs + rhs); }
 inline Square& operator-=(Square& lhs, int rhs) { return lhs = static_cast<Square>(lhs - rhs); }
 inline Square operator++(Square& lhs, int)
 {
@@ -109,6 +111,7 @@ enum MoveType : std::uint8_t { REGULAR, EN_PASSANT = 6, CASTLING, CAPTURE, INVAL
 inline MoveType& operator|=(MoveType& lhs, MoveType rhs) { return lhs = static_cast<MoveType>(lhs | rhs); }
 inline MoveType& operator&=(MoveType& lhs, MoveType rhs) { return lhs = static_cast<MoveType>(lhs & rhs); }
 inline MoveType operator|(MoveType lhs, MoveType rhs) { return lhs |= rhs; }
+inline MoveType operator&(MoveType lhs, MoveType rhs) { return lhs &= rhs; }
 inline MoveType operator~(MoveType m) { return static_cast<MoveType>(~static_cast<unsigned>(m)); }
 
 enum Move : std::uint16_t { NULL_MOVE = 0, INVALID = 0xffff };
@@ -121,20 +124,21 @@ inline MoveType type(Move mv) { return static_cast<MoveType>((mv >> 12) & 15); }
 std::ostream& operator<<(std::ostream& out, Move mv)
 {
     out << from(mv) << to(mv);
-    switch (type(mv) & ~CAPTURE)
+    switch (static_cast<PieceType>(type(mv) & ~CAPTURE))
     {
         case QUEEN: out << 'q'; break;
         case ROOK: out << 'r'; break;
         case BISHOP: out << 'b'; break;
         case KNIGHT: out << 'n'; break;
+        default: break;
     }
     return out;
 }
 
 struct Memo
 {
+    Piece moved;
     Piece captured;
-    bool promoted;
     Castling castling;
     Square en_passant;
     int halfmove_clock;
@@ -152,6 +156,12 @@ struct Position
 
     BitBoard all_bb() const { return color_bb[WHITE] | color_bb[BLACK]; }
 
+    void clear(Square sq, Piece p) { clear(sq, color(p), type(p)); }
+    void clear(Square sq, Color c, PieceType t);
+    void set(Square sq, Piece p) { set(sq, color(p), type(p), p); }
+    void set(Square sq, Color c, PieceType t) { set(sq, c, t, piece(c, t)); }
+    void set(Square sq, Color c, PieceType t, Piece p);
+
     Piece squares[64];
     BitBoard color_bb[2];
     BitBoard type_bb[6];
@@ -161,49 +171,52 @@ struct Position
     int halfmove_clock;
 } position;
 
+void Position::clear(Square sq, Color c, PieceType t)
+{
+    color_bb[c] &= ~sq;
+    type_bb[t] &= ~sq;
+    squares[sq] = NONE;
+}
+
+void Position::set(Square sq, Color c, PieceType t, Piece p)
+{
+    assert(t >= PAWN && t <= KING);
+    color_bb[c] |= sq;
+    type_bb[t] |= sq;
+    squares[sq] = p;
+}
+
 Memo Position::do_move(Move mv)
 {
-    Memo memo{squares[to(mv)], false, castling, en_passant, halfmove_clock};
+    Memo memo{squares[from(mv)], squares[to(mv)], castling, en_passant, halfmove_clock};
     ++halfmove_clock;
 
     MoveType mt = type(mv);
     if (mt & CAPTURE)
     {
-        mt &= ~CAPTURE;
         Square cap_sq = to(mv);
-        if (mt == EN_PASSANT)
+        if (mt == (EN_PASSANT | CAPTURE))
         {
             cap_sq = static_cast<Square>(cap_sq + rank_fwd(~next));
             memo.captured = squares[cap_sq];
-            squares[cap_sq] = NONE;
         }
 
-        color_bb[color(memo.captured)] &= ~cap_sq;
-        type_bb[type(memo.captured)] &= ~cap_sq;
+        clear(cap_sq, memo.captured);
         halfmove_clock = 0;
     }
     Piece moved = squares[from(mv)];
-    color_bb[color(moved)] &= ~from(mv);
-    type_bb[type(moved)] &= ~from(mv);
-    color_bb[color(moved)] |= to(mv);
-    squares[from(mv)] = NONE;
-    if (mt && mt <= static_cast<MoveType>(QUEEN))
-    {
-        memo.promoted = true;
-        type_bb[mt] |= to(mv);
-        squares[to(mv)] = static_cast<Piece>(mt | (next == WHITE ? 8 : 16));
-    }
+    clear(from(mv), moved);
+    MoveType promotion = mt & ~CAPTURE;
+    if (promotion && promotion <= static_cast<MoveType>(QUEEN))
+        set(to(mv), next, static_cast<PieceType>(promotion));
     else
-    {
-        type_bb[type(moved)] |= to(mv);
-        squares[to(mv)] = moved;
-    }
+        set(to(mv), moved);
     en_passant = NO_SQUARE;
 
     if (type(moved) == PAWN)
     {
         halfmove_clock = 0;
-        if (mt == EN_PASSANT && !(type(mv) & CAPTURE))
+        if (mt == EN_PASSANT)
             en_passant = static_cast<Square>(from(mv) + rank_fwd(next));
     }
     else if (mt == CASTLING)
@@ -211,12 +224,8 @@ Memo Position::do_move(Move mv)
         int rank = from(mv) & ~7;
         Square rook_from = static_cast<Square>(rank | (to(mv) < from(mv) ? 0 : 7));
         Square rook_to = static_cast<Square>(rank | (to(mv) < from(mv) ? 3 : 5));
-        color_bb[next] |= rook_to;
-        type_bb[ROOK] |= rook_to;
-        squares[rook_to] = squares[rook_from];
-        color_bb[next] &= ~rook_from;
-        type_bb[ROOK] &= ~rook_from;
-        squares[rook_from] = NONE;
+        clear(rook_from, next, ROOK);
+        set(rook_to, next, ROOK);
         castling &= ~static_cast<Castling>(3 << (2 * next));
     }
     else if (castling)
@@ -240,25 +249,16 @@ void Position::undo_move(Move mv, const Memo& memo)
     en_passant = memo.en_passant;
     castling = memo.castling;
 
-    Piece moved = squares[to(mv)];
-    color_bb[color(moved)] &= ~to(mv);
-    type_bb[type(moved)] &= ~to(mv);
-    color_bb[color(moved)] |= from(mv);
-    type_bb[memo.promoted ? PAWN : type(moved)] |= from(mv);
-    squares[to(mv)] = NONE;
-    squares[from(mv)] = memo.promoted ? static_cast<Piece>(PAWN | (next == WHITE ? 8 : 16)) : moved;
+    clear(to(mv), squares[to(mv)]);
+    set(from(mv), memo.moved);
 
     MoveType mt = type(mv);
     if (mt & CAPTURE)
     {
-        mt &= ~CAPTURE;
         Square cap_sq = to(mv);
-        if (mt == EN_PASSANT)
+        if (mt == (EN_PASSANT | CAPTURE))
             cap_sq = static_cast<Square>(cap_sq + rank_fwd(~next));
-        squares[cap_sq] = memo.captured;
-
-        color_bb[color(memo.captured)] |= cap_sq;
-        type_bb[type(memo.captured)] |= cap_sq;
+        set(cap_sq, memo.captured);
     }
 
     if (mt == CASTLING)
@@ -266,12 +266,8 @@ void Position::undo_move(Move mv, const Memo& memo)
         int rank = from(mv) & ~7;
         Square rook_from = static_cast<Square>(rank | (to(mv) < from(mv) ? 0 : 7));
         Square rook_to = static_cast<Square>(rank | (to(mv) < from(mv) ? 3 : 5));
-        color_bb[next] |= rook_from;
-        type_bb[ROOK] |= rook_from;
-        squares[rook_from] = squares[rook_to];
-        color_bb[next] &= ~rook_to;
-        type_bb[ROOK] &= ~rook_to;
-        squares[rook_to] = NONE;
+        clear(rook_to, next, ROOK);
+        set(rook_from, next, ROOK);
     }
 }
 
@@ -284,6 +280,8 @@ void Position::parse(std::istream& fen)
         b = EMPTY;
     for (BitBoard& b : type_bb)
         b = EMPTY;
+    for (Piece& p : squares)
+        p = NONE;
     Square sq = H1;
 
     for (char ch : token)
@@ -291,10 +289,7 @@ void Position::parse(std::istream& fen)
         if (ch == '/')
             sq -= 16;
         else if (ch >= '1' && ch <= '8')
-        {
-            for (int i = 0; i < ch - '0'; i++)
-                squares[sq++] = NONE;
-        }
+            sq += ch - '0';
         else
         {
             Piece p;
@@ -313,9 +308,7 @@ void Position::parse(std::istream& fen)
                 case 'q': p = BQUEEN; break;
                 case 'k': p = BKING; break;
             }
-            color_bb[color(p)] |= sq;
-            type_bb[type(p)] |= sq;
-            squares[sq++] = p;
+            set(sq++, p);
         }
     }
 

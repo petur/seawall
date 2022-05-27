@@ -789,6 +789,8 @@ struct MoveGen
     Move next();
 
     void generate();
+    void sort_moves();
+    int rank_move(Move mv) const;
     template<PieceType Type> void generate_pieces();
     template<PieceType Type> void generate_piece(Square sq);
     void generate_targets(Square sq, BitBoard targets);
@@ -897,6 +899,29 @@ template<PieceType Type> void MoveGen::generate_pieces()
         generate_piece<Type>(pop(pieces));
 }
 
+int MoveGen::rank_move(Move mv) const
+{
+    int rank = 0;
+    MoveType mt = type(mv);
+    if (mt & CAPTURE)
+    {
+        rank += 7 - type(position.squares[from(mv)]);
+        rank += 8 * type(position.squares[to(mv)]);
+    }
+    if (mv == best_move)
+        rank += 64;
+    return rank;
+}
+
+void MoveGen::sort_moves()
+{
+    std::sort(
+        &moves[index],
+        &moves[count],
+        [this](Move lhs, Move rhs) { return rank_move(lhs) > rank_move(rhs); }
+    );
+}
+
 void MoveGen::generate()
 {
     generated = static_cast<MoveGenType>(generated + 1);
@@ -906,6 +931,8 @@ void MoveGen::generate()
     generate_pieces<ROOK>();
     generate_pieces<QUEEN>();
     generate_pieces<KING>();
+    if (generated == CAPTURES)
+        sort_moves();
 }
 
 Move MoveGen::next()

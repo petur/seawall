@@ -445,11 +445,12 @@ Memo Position::do_move(Move mv)
         if (mt == EN_PASSANT)
             en_passant = static_cast<Square>(from(mv) + rank_fwd(next));
     }
-    else if (mt == CASTLING)
+    if (mt == CASTLING)
     {
         int rank = from(mv) & ~7;
         Square rook_from = static_cast<Square>(rank | (to(mv) < from(mv) ? 0 : 7));
         Square rook_to = static_cast<Square>(rank | (to(mv) < from(mv) ? 3 : 5));
+        assert(type_bb[ROOK] & rook_from);
         clear(rook_from, next, ROOK);
         set(rook_to, next, ROOK);
         castling &= ~static_cast<Castling>(3 << (2 * next));
@@ -1063,6 +1064,7 @@ bool Search::is_stopped(bool max)
 
 int Search::qsearch(int ply, int alpha, int beta)
 {
+    assert(ply < 128);
     int orig_alpha = alpha;
 
     Square king_sq = first_square(position.type_bb[KING] & position.color_bb[position.next]);

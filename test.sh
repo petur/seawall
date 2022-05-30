@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 diff -u --color \
     <(cat <<EOF
 id name seawall
@@ -35,3 +37,21 @@ quit
 EOF
     )
 
+(
+    echo '
+uci
+ucinewgame
+isready'
+echo 'position fen rn1qkb1r/1pp2pP1/3p4/p5Bp/4P3/2N5/PPP2PPP/R2bKB1R b KQkq - 0 9'
+echo 'go wtime 2404 winc 30 btime 2503 binc 30'
+sleep 0.4
+echo 'go wtime 2404 winc 30 btime 2503 binc 30'
+sleep 0.4
+echo 'stop'
+echo 'position fen rn2kb2/p3p1p1/2p1r3/1P2q3/3PBPb1/4Q2p/1P1P2PP/R1B1K2R w KQq - 0 17'
+echo 'go wtime 2095 winc 30 btime 1849 binc 30'
+sleep 0.4
+echo 'go wtime 2095 winc 30 btime 1849 binc 30'
+sleep 0.4
+echo 'quit'
+) | ./seawall

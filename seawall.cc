@@ -1188,10 +1188,16 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         if (!checkers && move_count && depth <= 2 && eval < alpha - 100 && !(type(mv) & (CAPTURE | PROMOTION)))
             continue;
 
+        int new_depth = checkers ? depth : depth - 1;
+
+        int reduction = 0;
+        if (move_count && !checkers && !(type(mv) & (CAPTURE | PROMOTION)) &&
+                !checkers && move_count >= 4 && new_depth >= 3 && mv != best &&
+                mv != stack[ply].killer_moves[0] && mv != stack[ply].killer_moves[1])
+            ++reduction;
+
         ++nodes;
         ++move_count;
-
-        int new_depth = checkers ? depth : depth - 1;
 
         Memo memo = position.do_move(mv);
         stack[ply + 1].key = position.hash();
@@ -1213,7 +1219,11 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         else
         {
             if (!pv || alpha > orig_alpha)
-                v = -search(false, ply + 1, new_depth, -alpha - 1, -alpha).first;
+            {
+                v = -search(false, ply + 1, new_depth - reduction, -alpha - 1, -alpha).first;
+                if (v > alpha && reduction)
+                    v = -search(false, ply + 1, new_depth, -alpha - 1, -alpha).first;
+            }
             if (v > alpha && alpha < beta - 1)
                 v = -search(pv, ply + 1, new_depth, -beta, -alpha).first;
         }

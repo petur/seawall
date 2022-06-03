@@ -418,52 +418,57 @@ Memo Position::do_move(Move mv)
     Memo memo{squares[from(mv)], squares[to(mv)], castling, en_passant, halfmove_clock};
     ++halfmove_clock;
 
-    MoveType mt = type(mv);
-    if (mt & CAPTURE)
+    if (mv)
     {
-        Square cap_sq = to(mv);
-        if (mt == (EN_PASSANT | CAPTURE))
+        MoveType mt = type(mv);
+        if (mt & CAPTURE)
         {
-            cap_sq = static_cast<Square>(cap_sq + rank_fwd(~next));
-            memo.captured = squares[cap_sq];
+            Square cap_sq = to(mv);
+            if (mt == (EN_PASSANT | CAPTURE))
+            {
+                cap_sq = static_cast<Square>(cap_sq + rank_fwd(~next));
+                memo.captured = squares[cap_sq];
+            }
+
+            clear(cap_sq, memo.captured);
+            halfmove_clock = 0;
         }
+        Piece moved = squares[from(mv)];
+        clear(from(mv), moved);
+        if (mt & PROMOTION)
+            set(to(mv), next, promotion(mt));
+        else
+            set(to(mv), moved);
+        en_passant = NO_SQUARE;
 
-        clear(cap_sq, memo.captured);
-        halfmove_clock = 0;
-    }
-    Piece moved = squares[from(mv)];
-    clear(from(mv), moved);
-    if (mt & PROMOTION)
-        set(to(mv), next, promotion(mt));
-    else
-        set(to(mv), moved);
-    en_passant = NO_SQUARE;
-
-    if (type(moved) == PAWN)
-    {
-        halfmove_clock = 0;
-        if (mt == EN_PASSANT)
-            en_passant = static_cast<Square>(from(mv) + rank_fwd(next));
-    }
-    if (mt == CASTLING)
-    {
-        int rank = from(mv) & ~7;
-        Square rook_from = static_cast<Square>(rank | (to(mv) < from(mv) ? 0 : 7));
-        Square rook_to = static_cast<Square>(rank | (to(mv) < from(mv) ? 3 : 5));
-        assert(type_bb[ROOK] & rook_from);
-        clear(rook_from, next, ROOK);
-        set(rook_to, next, ROOK);
-        castling &= ~static_cast<Castling>(3 << (2 * next));
-    }
-    else if (castling)
-    {
-        if (type(moved) == KING)
+        if (type(moved) == PAWN)
+        {
+            halfmove_clock = 0;
+            if (mt == EN_PASSANT)
+                en_passant = static_cast<Square>(from(mv) + rank_fwd(next));
+        }
+        if (mt == CASTLING)
+        {
+            int rank = from(mv) & ~7;
+            Square rook_from = static_cast<Square>(rank | (to(mv) < from(mv) ? 0 : 7));
+            Square rook_to = static_cast<Square>(rank | (to(mv) < from(mv) ? 3 : 5));
+            assert(type_bb[ROOK] & rook_from);
+            clear(rook_from, next, ROOK);
+            set(rook_to, next, ROOK);
             castling &= ~static_cast<Castling>(3 << (2 * next));
-        else if (type(moved) == ROOK)
-            castling &= ~static_cast<Castling>(((from(mv) & 1) ? WK : WQ) << (2 * next));
-        if ((type(mv) & CAPTURE) && type(memo.captured) == ROOK)
-            castling &= ~static_cast<Castling>(((to(mv) & 1) ? WK : WQ) << (2 * ~next));
+        }
+        else if (castling)
+        {
+            if (type(moved) == KING)
+                castling &= ~static_cast<Castling>(3 << (2 * next));
+            else if (type(moved) == ROOK)
+                castling &= ~static_cast<Castling>(((from(mv) & 1) ? WK : WQ) << (2 * next));
+            if ((type(mv) & CAPTURE) && type(memo.captured) == ROOK)
+                castling &= ~static_cast<Castling>(((to(mv) & 1) ? WK : WQ) << (2 * ~next));
+        }
     }
+    else
+        en_passant = NO_SQUARE;
 
     next = ~next;
     return memo;
@@ -476,25 +481,28 @@ void Position::undo_move(Move mv, const Memo& memo)
     en_passant = memo.en_passant;
     castling = memo.castling;
 
-    clear(to(mv), squares[to(mv)]);
-    set(from(mv), memo.moved);
-
-    MoveType mt = type(mv);
-    if (mt & CAPTURE)
+    if (mv)
     {
-        Square cap_sq = to(mv);
-        if (mt == (EN_PASSANT | CAPTURE))
-            cap_sq = static_cast<Square>(cap_sq + rank_fwd(~next));
-        set(cap_sq, memo.captured);
-    }
+        clear(to(mv), squares[to(mv)]);
+        set(from(mv), memo.moved);
 
-    if (mt == CASTLING)
-    {
-        int rank = from(mv) & ~7;
-        Square rook_from = static_cast<Square>(rank | (to(mv) < from(mv) ? 0 : 7));
-        Square rook_to = static_cast<Square>(rank | (to(mv) < from(mv) ? 3 : 5));
-        clear(rook_to, next, ROOK);
-        set(rook_from, next, ROOK);
+        MoveType mt = type(mv);
+        if (mt & CAPTURE)
+        {
+            Square cap_sq = to(mv);
+            if (mt == (EN_PASSANT | CAPTURE))
+                cap_sq = static_cast<Square>(cap_sq + rank_fwd(~next));
+            set(cap_sq, memo.captured);
+        }
+
+        if (mt == CASTLING)
+        {
+            int rank = from(mv) & ~7;
+            Square rook_from = static_cast<Square>(rank | (to(mv) < from(mv) ? 0 : 7));
+            Square rook_to = static_cast<Square>(rank | (to(mv) < from(mv) ? 3 : 5));
+            clear(rook_to, next, ROOK);
+            set(rook_from, next, ROOK);
+        }
     }
 }
 
@@ -778,6 +786,7 @@ struct Stack
 {
     std::uint64_t key;
     Move killer_moves[2];
+    Move prev_move;
 
     void save_killer(Move move);
 };
@@ -1073,6 +1082,16 @@ struct Search
     int qsearch(int ply, int alpha, int beta);
     std::pair<int, Move> search(bool pv, int ply, int depth, int alpha, int beta);
     void iterate(std::ostream& out, int max_depth);
+
+    Memo do_move(int ply, Move mv)
+    {
+        Memo memo = position.do_move(mv);
+        stack[ply + 1].prev_move = mv;
+        stack[ply + 1].key = position.hash();
+        return memo;
+    }
+
+    void undo_move(Move mv, const Memo& memo) { position.undo_move(mv, memo); }
 };
 
 Search::Search(std::istream& i, std::clock_t time, std::clock_t inc, std::clock_t movetime, Stack* st)
@@ -1138,13 +1157,13 @@ int Search::qsearch(int ply, int alpha, int beta)
             continue;
 
         ++nodes;
-        Memo memo = position.do_move(mv);
+        Memo memo = do_move(ply, mv);
         int v;
         if (attackers(from(mv) == king_sq ? to(mv) : king_sq, position.next))
             v = -32767;
         else
             v = -qsearch(ply + 1, -beta, -alpha);
-        position.undo_move(mv, memo);
+        undo_move(mv, memo);
 
         if (v > alpha)
         {
@@ -1175,15 +1194,33 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         prev_best = he->best_move;
     }
 
-    MoveGen gen{QUIETS, prev_best, stack[ply]};
-    Move best = NULL_MOVE;
-    int orig_alpha = alpha;
     Square king_sq = first_square(position.type_bb[KING] & position.color_bb[position.next]);
     BitBoard checkers = attackers(king_sq, ~position.next);
     int eval = evaluate();
 
     if (!pv && !checkers && depth <= 1 && eval > beta + 100)
         return {beta, NULL_MOVE};
+
+    if (!pv &&
+            ply > 1 &&
+            stack[ply].prev_move != NULL_MOVE &&
+            depth >= 4 &&
+            eval > beta + 50 &&
+            !checkers &&
+            alpha > -32000 &&
+            popcount(position.color_bb[position.next] & ~position.type_bb[PAWN]) > 1)
+    {
+        Memo memo = do_move(ply, NULL_MOVE);
+
+        int v = -search(false, ply + 1, depth - 2 - (eval - beta) / 200, -beta, -beta + 1).first;
+        undo_move(NULL_MOVE, memo);
+        if (v >= beta)
+            return {beta, NULL_MOVE};
+    }
+
+    MoveGen gen{QUIETS, prev_best, stack[ply]};
+    Move best = NULL_MOVE;
+    int orig_alpha = alpha;
 
     int move_count = 0;
     while (Move mv = gen.next())
@@ -1202,8 +1239,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         ++nodes;
         ++move_count;
 
-        Memo memo = position.do_move(mv);
-        stack[ply + 1].key = position.hash();
+        Memo memo = do_move(ply, mv);
 
         int v = beta;
         if (attackers(from(mv) == king_sq ? to(mv) : king_sq, position.next))
@@ -1231,7 +1267,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
                 v = -search(pv, ply + 1, new_depth, -beta, -alpha).first;
         }
 
-        position.undo_move(mv, memo);
+        undo_move(mv, memo);
 
         if (v > alpha)
         {
@@ -1359,7 +1395,9 @@ int main()
             parser >> token;
             while (parser >> token)
             {
-                position.do_move(position.parse_move(token));
+                Move mv = position.parse_move(token);
+                position.do_move(mv);
+                stack[position.halfmove_clock].prev_move = mv;
                 stack[position.halfmove_clock].key = position.hash();
             }
             if (debug)

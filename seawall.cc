@@ -1379,6 +1379,11 @@ int main()
             }
             std::cout << "readyok" << std::endl;
         }
+        else if (token == "ucinewgame")
+        {
+            if (hash_table)
+                std::fill_n(hash_table, hash_size, HashEntry{});
+        }
         else if (token == "position")
         {
             parser >> token;

@@ -260,7 +260,7 @@ inline MoveType operator~(MoveType m) { return static_cast<MoveType>(~static_cas
 inline PieceType promotion(MoveType m) { return static_cast<PieceType>(1 + (m & 3)); }
 inline MoveType promotion_move(PieceType t) { return static_cast<MoveType>((t - 1) | PROMOTION); }
 
-enum Move : std::uint16_t { NULL_MOVE = 0, INVALID = 0xffff };
+enum Move : std::uint16_t { NULL_MOVE = 0, FROM_TO_MASK = 0xfff, FROM_TO_SIZE = 0x1000, INVALID = 0xffff };
 
 inline Move move(Square from, Square to, MoveType type) { return static_cast<Move>(from | to << 6 | type << 12); }
 inline Square from(Move mv) { return static_cast<Square>(mv & 63); }
@@ -793,7 +793,7 @@ struct Stack
 
 void Stack::save_killer(Move move)
 {
-    if (move != killer_moves[0] && !(type(move) & CAPTURE))
+    if (move != killer_moves[0])
     {
         killer_moves[1] = killer_moves[0];
         killer_moves[0] = move;
@@ -815,6 +815,14 @@ bool repetition(const Stack* stack)
     }
     return false;
 }
+
+struct MoveHistory
+{
+    int hits;
+    int cuts;
+};
+
+MoveHistory history[2][FROM_TO_SIZE];
 
 enum MoveGenType { START, BEST, CAPTURES, QUIETS, END };
 
@@ -970,7 +978,10 @@ int MoveGen::rank_quiet(Move mv) const
 {
     int rank = 0;
     if (mv == stack.killer_moves[0] || mv == stack.killer_moves[1])
-        rank += 4;
+        rank += 4096;
+    const MoveHistory& h = history[position.next][mv & FROM_TO_MASK];
+    if (h.hits)
+        rank += 1024 * h.cuts / h.hits;
     return rank;
 }
 
@@ -1287,8 +1298,28 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         return {checkers ? -32767 + ply : 0, NULL_MOVE};
 
     assert(alpha > -32767);
-    if (alpha >= beta)
-        stack[ply].save_killer(best);
+    if (!(type(best) & CAPTURE))
+    {
+        if (alpha >= beta)
+            stack[ply].save_killer(best);
+        if (depth > 1)
+        {
+            MoveHistory* hist = history[position.next];
+            if (alpha >= beta)
+                hist[best & FROM_TO_MASK].cuts++;
+            for (int i = gen.index - 1; i >= 0; --i)
+            {
+                if (type(gen.moves[i]) & CAPTURE)
+                    break;
+                MoveHistory& h = hist[gen.moves[i] & FROM_TO_MASK];
+                if (++h.hits >= (1 << 16))
+                {
+                    h.hits >>= 1;
+                    h.cuts >>= 1;
+                }
+            }
+        }
+    }
     save_hash(alpha, depth, best, orig_alpha, beta);
     return {alpha, best};
 }
@@ -1386,6 +1417,9 @@ int main()
         }
         else if (token == "position")
         {
+            for (Color c : {WHITE, BLACK})
+                std::fill_n(history[c], FROM_TO_SIZE, MoveHistory{});
+
             parser >> token;
             if (token == "startpos")
             {

@@ -1036,7 +1036,7 @@ int evaluate()
     return position.piece_square_values[position.next] - position.piece_square_values[~position.next];
 }
 
-enum HashFlags : std::uint8_t { LOWER = 1 << 0, UPPER = 1 << 1 };
+enum HashFlags : std::uint8_t { GEN_MASK = 0x3f, LOWER = 0x40, UPPER = 0x80 };
 
 inline HashFlags& operator|=(HashFlags& lhs, HashFlags rhs) { return lhs = static_cast<HashFlags>(lhs | rhs); }
 
@@ -1047,25 +1047,37 @@ struct HashEntry
     Move best_move;
     std::int8_t depth;
     HashFlags flags;
+
+    int generation() const { return flags & GEN_MASK; }
 };
 
 HashEntry* hash_table;
 std::size_t hash_size;
+int hash_generation;
 
 std::size_t hash_index(const Position& position)
 {
     return ((position.hash() & 0xffffffffULL) * hash_size) >> 32;
 }
 
+int hash_score(int depth, HashFlags flags)
+{
+    if ((flags & (LOWER | UPPER)) == (LOWER | UPPER))
+        depth += 3;
+    return depth;
+}
+
 void save_hash(int value, int depth, Move mv, int alpha, int beta)
 {
-    HashFlags flags{};
+    HashFlags flags = static_cast<HashFlags>(hash_generation & GEN_MASK);
     if (value > alpha)
         flags |= LOWER;
     if (value < beta)
         flags |= UPPER;
-    hash_table[hash_index(position)] =
-        HashEntry{static_cast<std::uint16_t>(position.hash() >> 48), static_cast<std::int16_t>(value), mv, static_cast<std::int8_t>(depth), flags};
+    HashEntry& e = hash_table[hash_index(position)];
+    std::uint16_t key = static_cast<std::uint16_t>(position.hash() >> 48);
+    if (hash_score(e.depth, e.flags) <= hash_score(depth, flags) || (e.key != key && e.generation() != hash_generation))
+        e = HashEntry{key, static_cast<std::int16_t>(value), mv, static_cast<std::int8_t>(depth), flags};
 }
 
 HashEntry* load_hash()
@@ -1471,6 +1483,7 @@ int main()
                 }
             }
 
+            ++hash_generation;
             Search{std::cin, time, inc, movetime, &stack[position.halfmove_clock]}.iterate(std::cout, max_depth);
         }
         else if (token == "quit")

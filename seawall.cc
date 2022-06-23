@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <ctime>
 #include <iomanip>
 #include <iostream>
@@ -1368,6 +1369,27 @@ int main()
 {
     std::ios::sync_with_stdio(false);
     std::string line;
+
+#ifdef TUNE
+    double error = 0.;
+    double count = 0.;
+    while (getline(std::cin, line))
+    {
+        std::istringstream parser{line};
+        position.parse(parser);
+        int score, result;
+        parser.ignore();
+        parser >> score;
+        parser.ignore();
+        parser >> result;
+
+        error += std::pow(result * 0.5 - 1. / (1. + std::pow(0.9932, evaluate())), 2);
+        count += 1;
+    }
+    std::cout << (error / count) << std::endl;
+    return 0;
+#endif
+
     std::size_t hash_mb = 1;
     bool debug = false;
     Stack stack[256] = {};

@@ -15,7 +15,13 @@ out:
 test:	seawall
 	./test.sh
 
+tune:	seawall.tune
+	cat samples/*.csv | ./seawall.tune
+
+seawall.tune:	seawall.cc
+	$(CXX) $(CXXFLAGS) -DTUNE=1 -o $@ $^
+
 clean:
-	$(RM) -r seawall out
+	$(RM) -r seawall seawall.tune out
 
 .PHONY:	clean

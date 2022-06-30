@@ -827,11 +827,22 @@ MoveHistory history[2][FROM_TO_SIZE];
 
 enum MoveGenType { START, BEST, CAPTURES, QUIETS, END };
 
+struct RankedMove
+{
+    Move move;
+    std::int16_t rank;
+};
+
+bool operator<(RankedMove lhs, RankedMove rhs)
+{
+    return lhs.rank > rhs.rank;
+}
+
 struct MoveGen
 {
     MoveGenType wanted;
     MoveGenType generated;
-    Move moves[256];
+    RankedMove moves[256];
     int count;
     int index;
     Move best_move;
@@ -843,9 +854,7 @@ struct MoveGen
     Move next();
 
     void generate();
-    void sort_captures();
     int rank_capture(Move mv) const;
-    void sort_quiets();
     int rank_quiet(Move mv) const;
     template<PieceType Type> void generate_pieces(MoveGenType gen, BitBoard from_mask, BitBoard to_mask);
     template<PieceType Type> void generate_piece(MoveGenType gen, Square sq, BitBoard to_mask);
@@ -861,7 +870,7 @@ void MoveGen::generate_target(Square sq, Square target, MoveType mt)
     assert(!(target & ~63));
     Move mv = move(sq, target, mt);
     if (generated == BEST || mv != best_move)
-        moves[count++] = mv;
+        moves[count++] = {mv, static_cast<std::int16_t>((mt & CAPTURE) ? rank_capture(mv) : rank_quiet(mv))};
 }
 
 void MoveGen::generate_targets(Square sq, BitBoard targets, MoveType mt)
@@ -966,15 +975,6 @@ int MoveGen::rank_capture(Move mv) const
     return rank;
 }
 
-void MoveGen::sort_captures()
-{
-    std::sort(
-        &moves[index],
-        &moves[count],
-        [this](Move lhs, Move rhs) { return rank_capture(lhs) > rank_capture(rhs); }
-    );
-}
-
 int MoveGen::rank_quiet(Move mv) const
 {
     int rank = 0;
@@ -984,15 +984,6 @@ int MoveGen::rank_quiet(Move mv) const
     if (h.hits)
         rank += 1024 * h.cuts / h.hits;
     return rank;
-}
-
-void MoveGen::sort_quiets()
-{
-    std::sort(
-        &moves[index],
-        &moves[count],
-        [this](Move lhs, Move rhs) { return rank_quiet(lhs) > rank_quiet(rhs); }
-    );
 }
 
 void MoveGen::generate()
@@ -1017,10 +1008,7 @@ void MoveGen::generate()
     generate_pieces<ROOK>(gen, from_mask, to_mask);
     generate_pieces<QUEEN>(gen, from_mask, to_mask);
     generate_pieces<KING>(gen, from_mask, to_mask);
-    if (generated == CAPTURES)
-        sort_captures();
-    else if (generated == QUIETS)
-        sort_quiets();
+    std::sort(&moves[index], &moves[count]);
 }
 
 Move MoveGen::next()
@@ -1029,7 +1017,7 @@ Move MoveGen::next()
         generate();
     if (index >= count)
         return NULL_MOVE;
-    return moves[index++];
+    return moves[index++].move;
 }
 
 int evaluate()
@@ -1320,9 +1308,10 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
             hist[best & FROM_TO_MASK].cuts++;
             for (int i = gen.index - 1; i >= 0; --i)
             {
-                if (type(gen.moves[i]) & CAPTURE)
+                Move m = gen.moves[i].move;
+                if (type(m) & CAPTURE)
                     break;
-                MoveHistory& h = hist[gen.moves[i] & FROM_TO_MASK];
+                MoveHistory& h = hist[m & FROM_TO_MASK];
                 if (++h.hits >= (1 << 16))
                 {
                     h.hits >>= 1;

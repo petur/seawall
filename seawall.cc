@@ -1022,7 +1022,7 @@ Move MoveGen::next()
 
 int evaluate()
 {
-    return position.piece_square_values[position.next] - position.piece_square_values[~position.next];
+    return 15 + position.piece_square_values[position.next] - position.piece_square_values[~position.next];
 }
 
 enum HashFlags : std::uint8_t { GEN_MASK = 0x3f, LOWER = 0x40, UPPER = 0x80 };

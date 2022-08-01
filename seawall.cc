@@ -1320,7 +1320,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
             }
         }
     }
-    save_hash(alpha, depth, best, orig_alpha, beta);
+    save_hash(alpha, depth, best ? best : prev_best, orig_alpha, beta);
     return {alpha, best};
 }
 

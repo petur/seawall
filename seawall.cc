@@ -1077,6 +1077,29 @@ HashEntry* load_hash()
     return e;
 }
 
+struct PvLine
+{
+    int length;
+    Move moves[128];
+};
+
+static PvLine pv_lines[128];
+
+void update_pv(Move best_move, int ply, bool end)
+{
+    pv_lines[ply].moves[0] = best_move;
+    if (end)
+    {
+        pv_lines[ply].length = 1;
+    }
+    else
+    {
+        int len = pv_lines[ply + 1].length;
+        std::copy(&pv_lines[ply + 1].moves[0], &pv_lines[ply + 1].moves[len], &pv_lines[ply].moves[1]);
+        pv_lines[ply].length = 1 + len;
+    }
+}
+
 struct Search
 {
     std::istream& in;
@@ -1296,7 +1319,11 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     }
 
     if (move_count == 0)
+    {
+        if (pv)
+            pv_lines[ply].length = 0;
         return {checkers ? -32767 + ply : 0, NULL_MOVE};
+    }
 
     assert(alpha > -32767);
     if (!(type(best) & CAPTURE) && alpha >= beta)
@@ -1321,6 +1348,9 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         }
     }
     save_hash(alpha, depth, best ? best : prev_best, orig_alpha, beta);
+
+    if (pv && alpha > orig_alpha && alpha < beta)
+        update_pv(best, ply, depth <= 1);
     return {alpha, best};
 }
 
@@ -1344,7 +1374,10 @@ void Search::iterate(std::ostream& out, int max_depth)
             out << "cp " << best.first;
         out << " nodes " << nodes
             << std::fixed << std::setprecision(0) << " time " << (static_cast<double>(now - start) * 1000. / CLOCKS_PER_SEC)
-            << " nps " << (nodes * CLOCKS_PER_SEC / static_cast<double>(now - start)) << " pv " << best.second << std::endl;
+            << " nps " << (nodes * CLOCKS_PER_SEC / static_cast<double>(now - start)) << " pv";
+        for (int i = 0; i < pv_lines[0].length; i++)
+            out << ' ' << pv_lines[0].moves[i];
+        out << std::endl;
 
         if (is_stopped(false))
             break;

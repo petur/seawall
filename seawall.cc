@@ -1107,6 +1107,7 @@ struct Search
     std::clock_t max_time;
     std::clock_t start;
     long long nodes;
+    int sel_depth;
     bool stopped;
     Stack* stack;
 
@@ -1131,7 +1132,7 @@ struct Search
 
 Search::Search(std::istream& i, std::clock_t time, std::clock_t inc, std::clock_t movetime, Stack* st)
     : in{i}, target_time{std::numeric_limits<std::clock_t>::max()}, max_time{std::numeric_limits<std::clock_t>::max()},
-    start{std::clock()}, nodes{}, stopped{}, stack{st}
+    start{std::clock()}, nodes{}, sel_depth{}, stopped{}, stack{st}
 {
     if (movetime != -1)
         target_time = max_time = movetime;
@@ -1235,6 +1236,9 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
 
     if (!pv && !checkers && depth <= 1 && eval > beta + 100)
         return {beta, NULL_MOVE};
+
+    if (ply >= sel_depth)
+        sel_depth = ply + 1;
 
     if (!pv &&
             ply > 1 &&
@@ -1359,13 +1363,15 @@ void Search::iterate(std::ostream& out, int max_depth)
     std::pair<int, Move> best{};
     for (int depth = 1; depth <= max_depth; ++depth)
     {
+        sel_depth = 0;
+
         auto v = search(true, 0, depth, -32767, 32767);
         if (!stopped || !best.second)
             best = v;
 
         assert(best.second != NULL_MOVE);
         std::clock_t now = std::clock();
-        out << "info depth " << depth << " score ";
+        out << "info depth " << depth << " seldepth " << sel_depth << " score ";
         if (best.first > 32000)
             out << "mate " << ((32767 - best.first + 1) / 2);
         else if (best.first < -32000)

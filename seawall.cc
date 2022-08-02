@@ -677,6 +677,18 @@ BitBoard pawn_push[2][64];
 BitBoard pawn_double_push[2][64];
 BitBoard ray[64][8];
 
+struct LineMask
+{
+    BitBoard full;
+    BitBoard lower;
+    BitBoard upper;
+
+    LineMask() : full{}, lower{}, upper{} { }
+    LineMask(BitBoard l, BitBoard u) : full{l | u}, lower{l}, upper{u} { }
+};
+
+LineMask line_masks[64][4];
+
 BitBoard offset_bitboard(int file, int rank, const std::pair<int, int> (&offsets)[8])
 {
     BitBoard ret{};
@@ -729,41 +741,31 @@ void init_bitboards()
                 r += off.second;
             }
         }
+
+        line_masks[sq][0] = {ray[sq][0], ray[sq][4]};
+        line_masks[sq][1] = {ray[sq][6], ray[sq][2]};
+        line_masks[sq][2] = {ray[sq][1], ray[sq][5]};
+        line_masks[sq][3] = {ray[sq][7], ray[sq][3]};
     }
 }
 
-template <int N> BitBoard shift_signed(BitBoard b)
+BitBoard line_attack(BitBoard blockers, const LineMask& lm)
 {
-    if (N > 0)
-        return b << N;
-    else
-        return b >> -N;
-}
-
-template <int Shift> BitBoard ray_attack(BitBoard ray, BitBoard blockers)
-{
-    BitBoard v = ray & blockers;
-    v = shift_signed<Shift>(v);
-    v |= shift_signed<Shift>(v);
-    v |= shift_signed<Shift * 2>(v);
-    v |= shift_signed<Shift * 4>(v);
-    return ray & ~v;
+    BitBoard lower = lm.lower & blockers;
+    BitBoard upper = lm.upper & blockers;
+    return static_cast<BitBoard>(lm.full & (upper ^ (upper - (0x8000000000000000ULL >> __builtin_clzll(lower | 1)))));
 }
 
 BitBoard bishop_attack(Square sq, BitBoard blockers)
 {
-    return ray_attack<-9>(ray[sq][0], blockers)
-        | ray_attack<7>(ray[sq][2], blockers)
-        | ray_attack<9>(ray[sq][4], blockers)
-        | ray_attack<-7>(ray[sq][6], blockers);
+    return line_attack(blockers, line_masks[sq][0])
+        | line_attack(blockers, line_masks[sq][1]);
 }
 
 BitBoard rook_attack(Square sq, BitBoard blockers)
 {
-    return ray_attack<-1>(ray[sq][1], blockers)
-        | ray_attack<8>(ray[sq][3], blockers)
-        | ray_attack<1>(ray[sq][5], blockers)
-        | ray_attack<-8>(ray[sq][7], blockers);
+    return line_attack(blockers, line_masks[sq][2])
+        | line_attack(blockers, line_masks[sq][3]);
 }
 
 BitBoard queen_attack(Square sq, BitBoard blockers)
@@ -902,7 +904,7 @@ template<int Offset> void MoveGen::generate_castling(Square sq)
 {
     int rank = sq >> 3;
     Square rook_from = square(Offset < 0 ? 0 : 7, rank);
-    if (!(ray_attack<Offset>(ray[sq][Offset < 0 ? 1 : 5], position.all_bb()) & rook_from))
+    if (!(line_attack(position.all_bb(), line_masks[sq][2]) & rook_from))
         return;
 
     for (int i = 0; i <= 2; i++)

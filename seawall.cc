@@ -8,6 +8,7 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <vector>
 
 constexpr std::uint64_t piece_hash_values[768] =
 {
@@ -285,68 +286,75 @@ std::ostream& operator<<(std::ostream& out, Move mv)
     return out;
 }
 
-constexpr int material[6] = {100, 310, 325, 460, 955, 100000};
-constexpr int piece_square_table[6][64] =
+#ifndef TUNE
+constexpr
+#endif
+int material[6] = {100, 331, 364, 568, 1206, 100000};
+
+#ifndef TUNE
+constexpr
+#endif
+int piece_square_table[6][64] =
 {
     {
         0, 0, 0, 0, 0, 0, 0, 0,
-        -1, 1, 2, -15, -15, 2, 1, -1,
-        2, 3, 4, 5, 5, 4, 3, 2,
-        5, 6, 7, 8, 8, 7, 6, 5,
-        19, 20, 22, 24, 24, 22, 20, 19,
-        47, 28, 44, 45, 45, 44, 28, 47,
-        100, 101, 107, 108, 108, 107, 101, 100,
+        17, 18, 9, -9, -21, 27, 30, -3,
+        27, 23, 17, 22, 12, 23, 30, 20,
+        22, 12, 17, 34, 17, 15, 14, 11,
+        53, 43, 42, 54, 53, 39, 47, 39,
+        110, 77, 87, 73, 103, 98, 107, 110,
+        262, 248, 197, 219, 186, 162, 115, 120,
         0, 0, 0, 0, 0, 0, 0, 0,
     },
     {
-        -12, -23, -15, -3, -3, -15, -23, -12,
-        -18, 3, 4, 5, 5, 4, 3, -18,
-        -25, 6, 7, 8, 8, 7, 6, -25,
-        -3, 8, 9, 10, 10, 9, 8, -3,
-        5, 11, 13, 15, 15, 13, 11, 5,
-        7, 13, 14, 16, 16, 14, 13, 7,
-        5, 11, 12, 13, 13, 12, 11, 5,
-        -3, 7, 8, 9, 9, 8, 7, -3,
+        -24, -26, -81, -24, 17, -112, -35, -63,
+        -75, 3, -20, 22, 12, 6, -10, -72,
+        -26, 5, 20, 25, -4, 20, 7, -23,
+        7, 24, 9, 43, 28, 35, 37, -6,
+        33, 29, 75, 47, 57, 61, 46, -8,
+        31, 38, 60, 45, 31, 47, 33, 53,
+        -45, 14, 40, -3, -37, 35, 58, -25,
+        -79, -101, -65, -54, 5, -92, -167, -36,
     },
     {
-        -24, -4, -24, -8, -8, -24, -4, -24,
-        -10, 3, 4, 5, 5, 4, 3, -10,
-        -3, 5, 6, 7, 7, 6, 5, -3,
-        4, 7, 8, 9, 9, 8, 7, 4,
-        6, 9, 11, 13, 13, 11, 9, 6,
-        8, 11, 12, 14, 14, 12, 11, 8,
-        10, 13, 14, 15, 15, 14, 13, 10,
-        8, 11, 12, 13, 13, 12, 11, 8,
+        -6, -75, -35, 4, -33, -29, -51, -125,
+        -2, 16, -8, 14, 10, 47, 11, -42,
+        -6, 21, 10, 14, 11, 17, 26, 2,
+        14, 11, 12, 49, 27, 29, 1, 14,
+        2, 19, 12, 39, 37, 29, 38, -12,
+        23, 15, -42, 38, 57, 18, 25, 19,
+        -24, 15, 47, 46, -8, 16, 9, 13,
+        -35, 26, 57, -18, -89, -80, 75, -74,
     },
     {
-        -14, -21, 2, 9, 9, 2, -21, -14,
-        -26, 3, 4, 10, 10, 4, 3, -26,
-        -18, 5, 6, 12, 12, 6, 5, -18,
-        -11, 7, 8, 14, 14, 8, 7, -11,
-        6, 9, 11, 18, 18, 11, 9, 6,
-        8, 11, 12, 19, 19, 12, 11, 8,
-        10, 13, 14, 20, 20, 14, 13, 10,
-        12, 15, 16, 22, 22, 16, 15, 12,
+        -30, -14, -9, 5, 12, 3, -88, -36,
+        -48, 14, -5, -3, 4, -9, -17, -42,
+        -4, 12, 6, 19, 13, 2, 17, -19,
+        -12, -1, 10, 39, 20, 24, 54, 7,
+        19, 1, 31, 44, 33, 58, -11, 1,
+        -15, 67, 34, 52, 74, 24, 24, 30,
+        17, 43, 42, 76, 47, 12, 30, 28,
+        -5, 36, 58, 71, 61, 58, 48, 63,
     },
     {
-        -5, -4, 2, 3, 3, 2, -4, -5,
-        -3, 3, 4, 5, 5, 4, 3, -3,
-        4, 5, 6, 7, 7, 6, 5, 4,
-        6, 7, 8, 9, 9, 8, 7, 6,
-        8, 9, 10, 12, 12, 10, 9, 8,
-        10, 11, 13, 14, 14, 13, 11, 10,
-        12, 13, 14, 15, 15, 14, 13, 12,
-        14, 15, 16, 17, 17, 16, 15, 14,
+        -73, -20, 3, 0, -45, -85, -81, -70,
+        -107, -2, 2, 10, 9, 1, 16, -147,
+        -34, -18, -9, 13, 19, -3, 1, 23,
+        -5, 1, 37, 35, 24, 24, 16, -3,
+        -10, 21, -1, 14, 31, 32, 46, 54,
+        -19, 89, 6, 47, 38, 128, 33, 64,
+        -97, 29, -1, 59, 43, 11, 33, 15,
+        8, 40, -35, 11, 73, 73, 55, 13,
     },
     {
-        -21, 2, 2, -7, -7, 2, 2, -21,
-        1, 3, 3, -7, -7, 3, 3, 1,
-        3, 5, 6, 7, 7, 6, 5, 3,
-        5, 7, 8, 9, 9, 8, 7, 5,
-        7, 9, 10, 12, 12, 10, 9, 7,
-        9, 11, 12, 13, 13, 12, 11, 9,
-        11, 13, 14, 15, 15, 14, 13, 11,
-        9, 11, 12, 13, 13, 12, 11, 9,
+        -14, 17, 7, -20, -17, -14, 0, -39,
+        -3, 3, 11, -18, -3, 0, -10, -18,
+        -14, -7, 7, 7, 6, -6, -5, -11,
+        54, -27, 11, 15, 42, 44, 14, 12,
+        18, 13, 135, 40, 63, 77, 19, 4,
+        -66, -134, 18, 125, 61, 37, 98, 209,
+        -45, -82, -41, -21, 107, 163, 61, 41,
+        -91, -87, 178, 43, -136, -61, -65, -125,
     },
 };
 
@@ -371,6 +379,7 @@ struct Position
     void undo_move(Move mv, const Memo& memo);
 
     void parse(std::istream& fen);
+    void reset();
     Move parse_move(std::string_view s) const;
 
     void debug(std::ostream& out);
@@ -509,18 +518,11 @@ void Position::undo_move(Move mv, const Memo& memo)
 
 void Position::parse(std::istream& fen)
 {
+    reset();
+
     std::string token;
     fen >> token;
 
-    piece_hash = 0;
-    for (BitBoard& b : color_bb)
-        b = EMPTY;
-    for (BitBoard& b : type_bb)
-        b = EMPTY;
-    for (Piece& p : squares)
-        p = NONE;
-    for (int& v : piece_square_values)
-        v = 0;
     Square sq = H1;
 
     for (char ch : token)
@@ -579,6 +581,19 @@ void Position::parse(std::istream& fen)
 
     int fullmove_counter;
     fen >> halfmove_clock >> fullmove_counter;
+}
+
+void Position::reset()
+{
+    piece_hash = 0;
+    for (BitBoard& b : color_bb)
+        b = EMPTY;
+    for (BitBoard& b : type_bb)
+        b = EMPTY;
+    for (Piece& p : squares)
+        p = NONE;
+    for (int& v : piece_square_values)
+        v = 0;
 }
 
 Move Position::parse_move(std::string_view s) const
@@ -1393,6 +1408,52 @@ void Search::iterate(std::ostream& out, int max_depth)
     out << "bestmove " << best.second << std::endl;
 }
 
+#ifdef TUNE
+std::vector<std::pair<Position, int>> tuning_positions;
+
+double evaluation_error()
+{
+    double error = 0.;
+    for (auto& pos : tuning_positions)
+    {
+        position.reset();
+        position.next = pos.first.next;
+        position.halfmove_clock = pos.first.halfmove_clock;
+        for (Square sq = A1; sq <= H8; sq++)
+        {
+            if (pos.first.squares[sq])
+                position.set(sq, pos.first.squares[sq]);
+        }
+
+        error += std::pow(pos.second * 0.5 - 1. / (1. + std::pow(0.99589, evaluate())), 2);
+    }
+    return error / tuning_positions.size();
+}
+
+void find_best_value(std::pair<int*, double>& variable, double& best_error, int start_delta)
+{
+    double start_error = best_error;
+    for (int delta = start_delta; delta > 0; delta /= 2)
+    {
+        for (int sd : {-delta, delta})
+        {
+            int prev_value = *variable.first;
+            *variable.first += sd;
+            double error = evaluation_error();
+            if (error >= best_error)
+                *variable.first = prev_value;
+            else
+            {
+                best_error = error;
+                break;
+            }
+        }
+    }
+    variable.second = start_error - best_error;
+    std::cout << std::fixed << std::setprecision(4) << (10000. * best_error) << std::endl;
+}
+#endif
+
 const char startfen[] = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 int main()
@@ -1401,8 +1462,6 @@ int main()
     std::string line;
 
 #ifdef TUNE
-    double error = 0.;
-    double count = 0.;
     while (getline(std::cin, line))
     {
         std::istringstream parser{line};
@@ -1413,10 +1472,71 @@ int main()
         parser.ignore();
         parser >> result;
 
-        error += std::pow(result * 0.5 - 1. / (1. + std::pow(0.99575, evaluate())), 2);
-        count += 1;
+        if (popcount(position.type_bb[WHITE] | position.type_bb[BLACK]) <= 7)
+            continue;
+        if (position.halfmove_clock >= 30)
+            continue;
+        tuning_positions.push_back({position, result});
     }
-    std::cout << (error / count) << std::endl;
+
+    double best_error = evaluation_error();
+    std::cout << std::fixed << std::setprecision(4) << (10000. * best_error) << std::endl;
+
+    std::vector<std::pair<int*, double>> variables;
+    for (int i = 1; i < 5; i++)
+        variables.push_back({&material[i], 0});
+    for (auto& table : piece_square_table)
+    {
+        for (int& v : table)
+            variables.push_back({&v, 0});
+    }
+
+    for (int k = 0; k < 10; k++)
+    {
+        for (auto& p : variables)
+            find_best_value(p, best_error, 1);
+        for (int n = 0; n < 4; n++)
+        {
+            std::cout << "===== " << n << " =====" << std::endl;
+
+            std::sort(
+                variables.begin(), variables.end(),
+                [](const std::pair<int*, double>& lhs, const std::pair<int*, double>& rhs) { return lhs.second > rhs.second; }
+            );
+
+            double cutoff = variables.front().second * std::pow(2., -n - 1.);
+            for (auto& v : variables)
+            {
+                if (v.second < cutoff)
+                    break;
+                find_best_value(v, best_error, 32 / (n + k + 1));
+            }
+        }
+    }
+
+    std::cout << std::fixed << std::setprecision(4) << (10000. * best_error) << std::endl;
+    std::cout << "int material[6] = {";
+    for (int i = 0; i < 6; i++)
+    {
+        if (i > 0)
+            std::cout << ", ";
+        std::cout << material[i];
+    }
+    std::cout << "};" << std::endl;
+    std::cout << "int piece_square_table[6][64] =\n";
+    std::cout << "{\n";
+    for (int i = 0; i < 6; i++)
+    {
+        std::cout << "    {";
+        for (int j = 0; j < 64; j++)
+        {
+            if (j % 8 == 0)
+                std::cout << "\n        ";
+            std::cout << piece_square_table[i][j] << ", ";
+        }
+        std::cout << "\n    },\n";
+    }
+    std::cout << "};" << std::endl;
     return 0;
 #endif
 

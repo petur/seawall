@@ -1073,13 +1073,17 @@ int hash_score(int depth, HashFlags flags)
     return depth;
 }
 
-void save_hash(int value, int depth, Move mv, int alpha, int beta)
+void save_hash(int value, int ply, int depth, Move mv, int alpha, int beta)
 {
     HashFlags flags = static_cast<HashFlags>(hash_generation & GEN_MASK);
     if (value > alpha)
         flags |= LOWER;
     if (value < beta)
         flags |= UPPER;
+    if (value > 32000)
+        value += ply;
+    else if (value < -32000)
+        value -= ply;
     HashEntry& e = hash_table[hash_index(position)];
     std::uint16_t key = static_cast<std::uint16_t>(position.hash() >> 48);
     if (hash_score(e.depth, e.flags) <= hash_score(depth, flags) || (e.key != key && e.generation() != hash_generation))
@@ -1227,7 +1231,8 @@ int Search::qsearch(int ply, int alpha, int beta)
             break;
     }
 
-    save_hash(alpha, 0, best, orig_alpha, beta);
+    if (best)
+        save_hash(alpha, ply, 0, best, orig_alpha, beta);
     return alpha;
 }
 
@@ -1237,11 +1242,16 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     HashEntry* he = load_hash();
     if (he)
     {
-        if (!pv && he->depth >= depth && he->value && he->value > -32000 && he->value < 32000)
+        if ((!pv || depth <= 3) && he->depth >= depth + pv)
         {
-            if (he->value >= beta && (he->flags & LOWER))
+            int hv = he->value;
+            if (hv > 32000)
+                hv -= ply;
+            else if (hv < -32000)
+                hv += ply;
+            if (hv >= beta && (he->flags & LOWER))
                 return {beta, he->best_move};
-            if (he->value <= alpha && (he->flags & UPPER))
+            if (hv <= alpha && (he->flags & UPPER))
                 return {alpha, he->best_move};
         }
         prev_best = he->best_move;
@@ -1368,7 +1378,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
             }
         }
     }
-    save_hash(alpha, depth, best ? best : prev_best, orig_alpha, beta);
+    save_hash(alpha, ply, depth, best ? best : prev_best, orig_alpha, beta);
 
     if (pv && alpha > orig_alpha && alpha < beta)
         update_pv(best, ply, depth <= 1);

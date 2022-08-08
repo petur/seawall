@@ -839,11 +839,18 @@ bool repetition(const Stack* stack)
 
 struct MoveHistory
 {
-    int hits;
-    int cuts;
+    std::int16_t value;
+
+    MoveHistory(std::int16_t v = -8192) : value{v} { }
+
+    void hit(int n, bool cut)
+    {
+        value = static_cast<std::int16_t>(value - n * value / 8192 + (cut ? n : -n));
+    }
 };
 
 MoveHistory history[2][FROM_TO_SIZE];
+MoveHistory capture_history[30][64];
 
 enum MoveGenType { START, BEST, CAPTURES, QUIETS, END };
 
@@ -874,8 +881,8 @@ struct MoveGen
     Move next();
 
     void generate();
-    int rank_capture(Move mv) const;
-    int rank_quiet(Move mv) const;
+    std::int16_t rank_capture(Move mv) const;
+    std::int16_t rank_quiet(Move mv) const;
     template<PieceType Type> void generate_pieces(MoveGenType gen, BitBoard from_mask, BitBoard to_mask);
     template<PieceType Type> void generate_piece(MoveGenType gen, Square sq, BitBoard to_mask);
     void generate_targets(MoveGenType gen, Square sq, BitBoard targets);
@@ -890,7 +897,7 @@ void MoveGen::generate_target(Square sq, Square target, MoveType mt)
     assert(!(target & ~63));
     Move mv = move(sq, target, mt);
     if (generated == BEST || mv != best_move)
-        moves[count++] = {mv, static_cast<std::int16_t>((mt & CAPTURE) ? rank_capture(mv) : rank_quiet(mv))};
+        moves[count++] = {mv, (mt & CAPTURE) ? rank_capture(mv) : rank_quiet(mv)};
 }
 
 void MoveGen::generate_targets(Square sq, BitBoard targets, MoveType mt)
@@ -983,26 +990,17 @@ template<PieceType Type> void MoveGen::generate_pieces(MoveGenType gen, BitBoard
         generate_piece<Type>(gen, pop(pieces), to_mask);
 }
 
-int MoveGen::rank_capture(Move mv) const
+std::int16_t MoveGen::rank_capture(Move mv) const
 {
-    int rank = 0;
-    MoveType mt = type(mv);
-    if (mt & CAPTURE)
-    {
-        rank += 7 - type(position.squares[from(mv)]);
-        rank += 8 * type(position.squares[to(mv)]);
-    }
-    return rank;
+    return static_cast<std::int16_t>(8192 * (type(position.squares[to(mv)]) - 3) +
+            capture_history[6 * type(position.squares[to(mv)]) + type(position.squares[from(mv)])][to(mv)].value);
 }
 
-int MoveGen::rank_quiet(Move mv) const
+std::int16_t MoveGen::rank_quiet(Move mv) const
 {
-    int rank = 0;
+    std::int16_t rank = history[position.next][mv & FROM_TO_MASK].value;
     if (mv == stack.killer_moves[0] || mv == stack.killer_moves[1])
-        rank += 4096;
-    const MoveHistory& h = history[position.next][mv & FROM_TO_MASK];
-    if (h.hits)
-        rank += 1024 * h.cuts / h.hits;
+        rank += 16354;
     return rank;
 }
 
@@ -1315,6 +1313,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         if (attackers(from(mv) == king_sq ? to(mv) : king_sq, position.next))
         {
             v = -32767;
+            gen.moves[gen.index - 1].move = NULL_MOVE;
             --move_count;
         }
         else if (repetition(&stack[ply + 1]))
@@ -1361,24 +1360,24 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     }
 
     assert(alpha > -32767);
-    if (!(type(best) & CAPTURE) && alpha >= beta)
+    if (alpha >= beta)
     {
-        stack[ply].save_killer(best);
+        if (!(type(best) & CAPTURE))
+            stack[ply].save_killer(best);
         if (depth > 1)
         {
+            int inc = 450 + 36 * depth;
             MoveHistory* hist = history[position.next];
-            hist[best & FROM_TO_MASK].cuts++;
             for (int i = gen.index - 1; i >= 0; --i)
             {
                 Move m = gen.moves[i].move;
+                if (!m)
+                    continue;
+                bool cut = (m == best);
                 if (type(m) & CAPTURE)
-                    break;
-                MoveHistory& h = hist[m & FROM_TO_MASK];
-                if (++h.hits >= (1 << 16))
-                {
-                    h.hits >>= 1;
-                    h.cuts >>= 1;
-                }
+                    capture_history[6 * type(position.squares[to(m)]) + type(position.squares[from(m)])][to(m)].hit(inc, cut);
+                else
+                    hist[m & FROM_TO_MASK].hit(inc, cut);
             }
         }
     }
@@ -1615,7 +1614,9 @@ int main()
         {
             for (Color c : {WHITE, BLACK})
                 std::fill_n(history[c], FROM_TO_SIZE, MoveHistory{});
-
+            for (int c = PAWN; c < KING; c++)
+                for (int m = PAWN; m <= KING; m++)
+                    std::fill_n(capture_history[6 * c + m], 64, MoveHistory{static_cast<std::int16_t>(384 - m)});
             parser >> token;
             if (token == "startpos")
             {

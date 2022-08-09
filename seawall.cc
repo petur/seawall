@@ -1093,7 +1093,8 @@ void save_hash(int value, int ply, int depth, Move mv, int alpha, int beta)
 HashEntry* load_hash()
 {
     HashEntry* e = &hash_table[hash_index(position)];
-    if (e->key != static_cast<uint16_t>(position.hash() >> 48))
+    if (e->key != static_cast<uint16_t>(position.hash() >> 48) ||
+            (e->best_move && !(position.color_bb[position.next] & from(e->best_move))))
         return nullptr;
     return e;
 }
@@ -1242,7 +1243,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     HashEntry* he = load_hash();
     if (he)
     {
-        if ((!pv || depth <= 3) && he->depth >= depth + pv)
+        if ((!pv || (ply > 0 && depth <= 3)) && he->depth >= depth + pv)
         {
             int hv = he->value;
             if (hv > 32000)

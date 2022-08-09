@@ -10,6 +10,9 @@
 #include <string_view>
 #include <vector>
 
+#define STRINGIFY0(x) #x
+#define STRINGIFY(x) STRINGIFY0(x)
+
 constexpr std::uint64_t piece_hash_values[768] =
 {
     0x01510564b3120641, 0x81d4176bde347ed0, 0x87bb68b4058d6c0e, 0x2657ac0ae9cfb089, 0x239bb0832ef29261, 0x59d1f0891d937542,
@@ -1564,7 +1567,7 @@ int main()
         if (token == "uci")
         {
             std::cout
-                << "id name seawall\n"
+                << "id name seawall " STRINGIFY(SEAWALL_VERSION) << "\n"
                 << "id author petur\n"
                 << "option name Hash type spin default 1 min 1 max 65536\n"
                 << "uciok" << std::endl;

@@ -1,6 +1,11 @@
 CXXFLAGS = -Wall -Wextra -Werror -std=c++17 -O3 -march=native -mtune=native
+version := $(shell date '+%Y%m%d')
 branch := $(shell git branch --show-current)
-release := out/seawall.$(branch)
+ifneq ($(branch),main)
+version := $(version)-$(branch)
+endif
+release := out/seawall-$(version)
+CPPFLAGS += -DSEAWALL_VERSION=$(version)
 
 all:	test $(release)
 

@@ -4,11 +4,6 @@ set -e
 
 diff -u --color \
     <(cat <<EOF
-id name seawall
-id author petur
-option name Hash type spin default 1 min 1 max 65536
-uciok
-readyok
 info string fen rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
 info string fen rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1
 info string fen r1bqkbnr/pppppppp/2n5/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 1 1
@@ -20,7 +15,7 @@ info string fen rnbqkbnr/pp2pppp/3P4/2p5/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1
 info string fen Q6k/8/8/8/8/8/8/7K b - - 0 1
 EOF
     ) \
-    <(./seawall <<EOF
+    <(./seawall <<EOF |
 uci
 debug on
 ucinewgame
@@ -36,7 +31,7 @@ position startpos moves e2e4 c7c5 e4e5 d7d5 e5d6
 position fen 7k/P7/8/8/8/8/8/7K w - - 0 1 moves a7a8q
 quit
 EOF
-    )
+    grep '^info')
 
 (
     echo '

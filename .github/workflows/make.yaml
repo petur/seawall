@@ -7,4 +7,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - run: make
+    - run: make ARCH=haswell LDFLAGS='-static -s'
+    - uses: actions/upload-artifact@v3
+      with:
+        name: linux
+        path: out/seawall-*

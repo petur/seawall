@@ -1,4 +1,7 @@
-CXXFLAGS = -Wall -Wextra -Werror -std=c++17 -O3 -march=native -mtune=native
+ifeq ($(ARCH),)
+ARCH := native
+endif
+CXXFLAGS = -Wall -Wextra -Werror -std=c++17 -O3 -march=$(ARCH) -mtune=$(ARCH)
 version := $(shell date '+%Y%m%d')
 branch := $(shell git branch --show-current)
 ifneq ($(branch),main)

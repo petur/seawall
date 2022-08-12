@@ -8,9 +8,11 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - run: make ARCH=haswell LDFLAGS='-static -s' SUFFIX=-linux
+    - id: date
+      run: date '+::set-output name=date::%Y%m%d'
     - uses: actions/upload-artifact@v3
       with:
-        name: linux
+        name: seawall-${{ steps.date.outputs.date }}-linux
         path: out/seawall-*
 
   make-windows:
@@ -24,8 +26,11 @@ jobs:
           gcc
     - uses: actions/checkout@v3
     - shell: msys2 {0}
-      run: make ARCH=haswell LDFLAGS='-static -s' SUFFIX=-msys2
+      run: make ARCH=haswell LDFLAGS='-static -s' SUFFIX=-windows-msys2
+    - shell: msys2 {0}
+      id: date
+      run: date '+::set-output name=date::%Y%m%d'
     - uses: actions/upload-artifact@v3
       with:
-        name: windows
+        name: seawall-${{ steps.date.outputs.date }}-windows-msys2
         path: out/seawall-*

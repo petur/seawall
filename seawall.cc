@@ -1157,12 +1157,12 @@ Search::Search(std::istream& i, std::clock_t time, std::clock_t inc, std::clock_
     : in{i}, target_time{std::numeric_limits<std::clock_t>::max()}, max_time{std::numeric_limits<std::clock_t>::max()},
     start{std::clock()}, nodes{}, sel_depth{}, stopped{}, stack{st}
 {
-    if (movetime != -1)
+    if (movetime != static_cast<std::clock_t>(-1))
         target_time = max_time = movetime;
-    else if (time != -1)
+    else if (time != static_cast<std::clock_t>(-1))
     {
         int pieces = popcount(position.color_bb[WHITE] | position.color_bb[BLACK]);
-        time -= std::min(time / 8, CLOCKS_PER_SEC / 4);
+        time -= std::min<std::clock_t>(time / 8, CLOCKS_PER_SEC / 4);
         max_time = std::min(time, time / (2 + pieces / 8) + inc);
         target_time = std::min(max_time, time / (16 + 2 * pieces) + inc / 4);
     }

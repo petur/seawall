@@ -7,7 +7,7 @@ branch := $(shell git branch --show-current)
 ifneq ($(branch),main)
 version := $(version)-$(branch)
 endif
-release := out/seawall-$(version)
+release := out/seawall-$(version)$(SUFFIX)
 CPPFLAGS += -DSEAWALL_VERSION=$(version)
 
 all:	test $(release)

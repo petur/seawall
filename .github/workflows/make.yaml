@@ -7,8 +7,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - run: make ARCH=haswell LDFLAGS='-static -s'
+    - run: make ARCH=haswell LDFLAGS='-static -s' SUFFIX=-linux
     - uses: actions/upload-artifact@v3
       with:
         name: linux
+        path: out/seawall-*
+
+  make-windows:
+    runs-on: windows-latest
+    steps:
+    - uses: msys2/setup-msys2@v2
+      with:
+        install: >-
+          git
+          base-devel
+          gcc
+    - uses: actions/checkout@v3
+    - shell: msys2 {0}
+      run: make ARCH=haswell LDFLAGS='-static -s' SUFFIX=-msys2
+    - uses: actions/upload-artifact@v3
+      with:
+        name: windows
         path: out/seawall-*

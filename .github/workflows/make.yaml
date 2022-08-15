@@ -20,17 +20,18 @@ jobs:
     steps:
     - uses: msys2/setup-msys2@v2
       with:
+        msystem: mingw64
         install: >-
           git
           base-devel
-          gcc
+          mingw-w64-x86_64-gcc
     - uses: actions/checkout@v3
     - shell: msys2 {0}
-      run: make ARCH=haswell LDFLAGS='-static -s' SUFFIX=-windows-msys2
+      run: make ARCH=haswell LDFLAGS='-static -s' SUFFIX=-windows-mingw64
     - shell: msys2 {0}
       id: date
       run: date '+::set-output name=date::%Y%m%d'
     - uses: actions/upload-artifact@v3
       with:
-        name: seawall-${{ steps.date.outputs.date }}-windows-msys2
+        name: seawall-${{ steps.date.outputs.date }}-windows-mingw64
         path: out/seawall-*

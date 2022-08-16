@@ -1126,6 +1126,7 @@ void update_pv(Move best_move, int ply, bool end)
 struct Search
 {
     std::istream& in;
+    std::ostream& out;
     std::clock_t target_time;
     std::clock_t max_time;
     std::clock_t start;
@@ -1134,13 +1135,13 @@ struct Search
     bool stopped;
     Stack* stack;
 
-    Search(std::istream& i, std::clock_t time, std::clock_t inc, std::clock_t movetime, Stack* stack);
+    Search(std::istream& i, std::ostream& o, std::clock_t time, std::clock_t inc, std::clock_t movetime, Stack* stack);
 
     bool is_stopped(bool max);
 
     int qsearch(int ply, int alpha, int beta);
     std::pair<int, Move> search(bool pv, int ply, int depth, int alpha, int beta);
-    void iterate(std::ostream& out, int max_depth);
+    void iterate(int max_depth);
 
     Memo do_move(int ply, Move mv)
     {
@@ -1153,8 +1154,8 @@ struct Search
     void undo_move(Move mv, const Memo& memo) { position.undo_move(mv, memo); }
 };
 
-Search::Search(std::istream& i, std::clock_t time, std::clock_t inc, std::clock_t movetime, Stack* st)
-    : in{i}, target_time{std::numeric_limits<std::clock_t>::max()}, max_time{std::numeric_limits<std::clock_t>::max()},
+Search::Search(std::istream& i, std::ostream& o, std::clock_t time, std::clock_t inc, std::clock_t movetime, Stack* st)
+    : in{i}, out{o}, target_time{std::numeric_limits<std::clock_t>::max()}, max_time{std::numeric_limits<std::clock_t>::max()},
     start{std::clock()}, nodes{}, sel_depth{}, stopped{}, stack{st}
 {
     if (movetime != static_cast<std::clock_t>(-1))
@@ -1176,10 +1177,15 @@ bool Search::is_stopped(bool max)
             stopped = true;
         else if ((nodes & 0xffff) == 0 && in.rdbuf()->in_avail())
         {
+            std::string line;
+            std::getline(in, line);
+            std::istringstream parser{line};
             std::string token;
-            in >> token;
+            parser >> token;
             if (token == "stop")
                 stopped = true;
+            else if (token == "isready")
+                out << "readyok" << std::endl;
         }
     }
     return stopped;
@@ -1391,7 +1397,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     return {alpha, best};
 }
 
-void Search::iterate(std::ostream& out, int max_depth)
+void Search::iterate(int max_depth)
 {
     std::pair<int, Move> best{};
     for (int depth = 1; depth <= max_depth; ++depth)
@@ -1674,7 +1680,7 @@ int main()
             }
 
             ++hash_generation;
-            Search{std::cin, time, inc, movetime, &stack[position.halfmove_clock]}.iterate(std::cout, max_depth);
+            Search{std::cin, std::cout, time, inc, movetime, &stack[position.halfmove_clock]}.iterate(max_depth);
         }
         else if (token == "quit")
         {

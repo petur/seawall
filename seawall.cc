@@ -1291,18 +1291,21 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     int orig_alpha = alpha;
 
     int move_count = 0;
+    int extension = 0;
+    if (checkers)
+        extension++;
+
     while (Move mv = gen.next())
     {
         if (!checkers && move_count && depth <= 5 && eval < alpha - (depth * 300 - 200) && !(type(mv) & (CAPTURE | PROMOTION)))
             continue;
 
-        int new_depth = checkers ? depth : depth - 1;
+        int new_depth = depth + extension - 1;
 
         int reduction = 0;
-        if (move_count && !checkers && !(type(mv) & (CAPTURE | PROMOTION)) &&
-                !checkers && move_count >= 4 && new_depth >= 3 && mv != best &&
-                mv != stack[ply].killer_moves[0] && mv != stack[ply].killer_moves[1])
-            ++reduction;
+        if (new_depth >= 3 && move_count && !checkers && !(type(mv) & (CAPTURE | PROMOTION)) &&
+                mv != prev_best && mv != stack[ply].killer_moves[0] && mv != stack[ply].killer_moves[1])
+            reduction = std::clamp(move_count / 4 + (he && !(he->flags & LOWER)), 0, depth / 3);
 
         ++nodes;
         ++move_count;

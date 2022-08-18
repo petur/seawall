@@ -1162,10 +1162,11 @@ Search::Search(std::istream& i, std::ostream& o, std::clock_t time, std::clock_t
         target_time = max_time = movetime;
     else if (time != static_cast<std::clock_t>(-1))
     {
-        int pieces = popcount(position.color_bb[WHITE] | position.color_bb[BLACK]);
         time -= std::min<std::clock_t>(time / 8, CLOCKS_PER_SEC / 4);
+
+        int pieces = popcount(position.color_bb[WHITE] | position.color_bb[BLACK]);
         max_time = std::min(time, time / (2 + pieces / 8) + inc);
-        target_time = std::min(max_time, time / (16 + 2 * pieces) + inc / 4);
+        target_time = std::min(max_time, 4 * time / (32 + 9 * pieces) + inc / 4);
     }
 }
 

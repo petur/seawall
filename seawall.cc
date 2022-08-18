@@ -1165,8 +1165,8 @@ Search::Search(std::istream& i, std::ostream& o, std::clock_t time, std::clock_t
         time -= std::min<std::clock_t>(time / 8, CLOCKS_PER_SEC / 4);
 
         int pieces = popcount(position.color_bb[WHITE] | position.color_bb[BLACK]);
-        max_time = std::min(time, time / (2 + pieces / 8) + inc);
-        target_time = std::min(max_time, 4 * time / (32 + 9 * pieces) + inc / 4);
+        max_time = std::min(time, 8 * time / (16 + pieces) + inc);
+        target_time = std::min(max_time, 8 * time / (32 + 19 * pieces) + 16 * inc / (32 + pieces));
     }
 }
 

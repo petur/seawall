@@ -1056,6 +1056,15 @@ struct HashEntry
     HashFlags flags;
 
     int generation() const { return flags & GEN_MASK; }
+    int get_value(int ply) const
+    {
+        int hv = value;
+        if (hv > 32000)
+            hv -= ply;
+        else if (hv < -32000)
+            hv += ply;
+        return hv;
+    }
 };
 
 HashEntry* hash_table;
@@ -1208,9 +1217,13 @@ int Search::qsearch(int ply, int alpha, int beta)
 
     Move best = NULL_MOVE;
 
-    HashEntry* e = load_hash();
-    if (e)
-        best = e->best_move;
+    HashEntry* he = load_hash();
+    if (he)
+    {
+        best = he->best_move;
+        if ((he->flags & LOWER) && he->get_value(ply) >= beta)
+            return beta;
+    }
 
     MoveGen gen{checkers ? QUIETS : CAPTURES, best, stack[ply]};
 
@@ -1249,15 +1262,12 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
 {
     Move prev_best = NULL_MOVE;
     HashEntry* he = load_hash();
+    int hv;
     if (he)
     {
-        if ((!pv || (ply > 0 && depth <= 3)) && he->depth >= depth + pv)
+        hv = he->get_value(ply);
+        if ((!pv || ply > 0) && he->depth >= depth + pv)
         {
-            int hv = he->value;
-            if (hv > 32000)
-                hv -= ply;
-            else if (hv < -32000)
-                hv += ply;
             if (hv >= beta && (he->flags & LOWER))
                 return {beta, he->best_move};
             if (hv <= alpha && (he->flags & UPPER))
@@ -1269,6 +1279,8 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     Square king_sq = first_square(position.type_bb[KING] & position.color_bb[position.next]);
     BitBoard checkers = attackers(king_sq, ~position.next);
     int eval = evaluate();
+    if (he && ((hv > eval && (he->flags & LOWER)) || (hv < eval && (he->flags & UPPER))))
+        eval = hv;
 
     if (!pv && !checkers && depth <= 1 && eval > beta + 100)
         return {beta, NULL_MOVE};

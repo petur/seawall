@@ -1144,7 +1144,7 @@ struct Search
     bool stopped;
     Stack* stack;
 
-    Search(std::istream& i, std::ostream& o, std::clock_t time, std::clock_t inc, std::clock_t movetime, Stack* stack);
+    Search(std::istream& i, std::ostream& o, std::clock_t time, std::clock_t inc, std::clock_t movetime, int moves_to_go, Stack* stack);
 
     bool is_stopped(bool max);
 
@@ -1163,7 +1163,7 @@ struct Search
     void undo_move(Move mv, const Memo& memo) { position.undo_move(mv, memo); }
 };
 
-Search::Search(std::istream& i, std::ostream& o, std::clock_t time, std::clock_t inc, std::clock_t movetime, Stack* st)
+Search::Search(std::istream& i, std::ostream& o, std::clock_t time, std::clock_t inc, std::clock_t movetime, int moves_to_go, Stack* st)
     : in{i}, out{o}, target_time{std::numeric_limits<std::clock_t>::max()}, max_time{std::numeric_limits<std::clock_t>::max()},
     start{std::clock()}, nodes{}, sel_depth{}, stopped{}, stack{st}
 {
@@ -1175,7 +1175,7 @@ Search::Search(std::istream& i, std::ostream& o, std::clock_t time, std::clock_t
 
         int pieces = popcount(position.color_bb[WHITE] | position.color_bb[BLACK]);
         max_time = std::min(time, 8 * time / (16 + pieces) + inc);
-        target_time = std::min(max_time, 8 * time / (32 + 19 * pieces) + 16 * inc / (32 + pieces));
+        target_time = std::min(max_time, 8 * time / std::min(32 + 19 * pieces, 11 * moves_to_go) + 16 * inc / (32 + pieces));
     }
 }
 
@@ -1667,6 +1667,7 @@ int main()
             std::clock_t time = -1;
             std::clock_t inc = 0;
             std::clock_t movetime = -1;
+            int moves_to_go = 10000;
 
             while (parser >> token)
             {
@@ -1690,10 +1691,12 @@ int main()
                     parser >> millis;
                     movetime = millis * CLOCKS_PER_SEC / 1000L;
                 }
+                if (token == "movestogo")
+                    parser >> moves_to_go;
             }
 
             ++hash_generation;
-            Search{std::cin, std::cout, time, inc, movetime, &stack[position.halfmove_clock]}.iterate(max_depth);
+            Search{std::cin, std::cout, time, inc, movetime, moves_to_go, &stack[position.halfmove_clock]}.iterate(max_depth);
         }
         else if (token == "quit")
         {

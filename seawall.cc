@@ -1282,7 +1282,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     if (he && ((hv > eval && (he->flags & LOWER)) || (hv < eval && (he->flags & UPPER))))
         eval = hv;
 
-    if (!pv && !checkers && depth <= 1 && eval > beta + 100)
+    if (!pv && !checkers && depth <= 3 && eval > beta + 240 * depth - 140)
         return {beta, NULL_MOVE};
 
     if (ply >= sel_depth)
@@ -1316,7 +1316,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
 
     while (Move mv = gen.next())
     {
-        if (!checkers && move_count && depth <= 5 && eval < alpha - (depth * 300 - 200) && !(type(mv) & (CAPTURE | PROMOTION)))
+        if (!checkers && move_count && depth <= 5 && eval < alpha - (depth * 240 - 140) && !(type(mv) & (CAPTURE | PROMOTION)))
             continue;
 
         int new_depth = depth + extension - 1;

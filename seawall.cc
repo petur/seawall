@@ -1136,7 +1136,10 @@ struct Search
 {
     std::istream& in;
     std::ostream& out;
-    std::clock_t target_time;
+    std::clock_t total_time;
+    std::clock_t increment;
+    std::clock_t movetime;
+    int moves_to_go;
     std::clock_t max_time;
     std::clock_t start;
     long long nodes;
@@ -1146,7 +1149,9 @@ struct Search
 
     Search(std::istream& i, std::ostream& o, std::clock_t time, std::clock_t inc, std::clock_t movetime, int moves_to_go, Stack* stack);
 
-    bool is_stopped(bool max);
+    bool is_stopped();
+    bool check_stop_command();
+    bool check_time(int changes, int improving);
 
     int qsearch(int ply, int alpha, int beta);
     std::pair<int, Move> search(bool pv, int ply, int depth, int alpha, int beta);
@@ -1163,40 +1168,62 @@ struct Search
     void undo_move(Move mv, const Memo& memo) { position.undo_move(mv, memo); }
 };
 
-Search::Search(std::istream& i, std::ostream& o, std::clock_t time, std::clock_t inc, std::clock_t movetime, int moves_to_go, Stack* st)
-    : in{i}, out{o}, target_time{std::numeric_limits<std::clock_t>::max()}, max_time{std::numeric_limits<std::clock_t>::max()},
+Search::Search(std::istream& i, std::ostream& o, std::clock_t time, std::clock_t inc, std::clock_t mt, int mtg, Stack* st)
+    : in{i}, out{o}, total_time{time}, increment{inc}, movetime{mt}, moves_to_go{mtg}, max_time{mt},
     start{std::clock()}, nodes{}, sel_depth{}, stopped{}, stack{st}
 {
-    if (movetime != static_cast<std::clock_t>(-1))
-        target_time = max_time = movetime;
-    else if (time != static_cast<std::clock_t>(-1))
+    if (total_time != static_cast<std::clock_t>(-1))
     {
-        time -= std::min<std::clock_t>(time / 8, CLOCKS_PER_SEC / 4);
-
-        int pieces = popcount(position.color_bb[WHITE] | position.color_bb[BLACK]);
-        max_time = std::min(time, 8 * time / (16 + pieces) + inc);
-        target_time = std::min(max_time, 8 * time / std::min(32 + 19 * pieces, 11 * moves_to_go) + 16 * inc / (32 + pieces));
+        total_time -= std::min<std::clock_t>(total_time / 8, CLOCKS_PER_SEC / 4);
+        movetime = max_time = std::min(movetime, total_time);
     }
 }
 
-bool Search::is_stopped(bool max)
+bool Search::is_stopped()
 {
-    if (!stopped && (!max || (nodes & 0xff) == 0))
+    if (!stopped && (nodes & 0xff) == 0)
     {
-        if (std::clock() - start > (max ? max_time : target_time))
+        if (std::clock() - start > max_time)
             stopped = true;
-        else if ((nodes & 0xffff) == 0 && in.rdbuf()->in_avail())
+        else if ((nodes & 0xffff) == 0)
         {
-            std::string line;
-            std::getline(in, line);
-            std::istringstream parser{line};
-            std::string token;
-            parser >> token;
-            if (token == "stop")
+            if (check_stop_command())
                 stopped = true;
-            else if (token == "isready")
-                out << "readyok" << std::endl;
         }
+    }
+    return stopped;
+}
+
+bool Search::check_stop_command()
+{
+    if (in.rdbuf()->in_avail())
+    {
+        std::string line;
+        std::getline(in, line);
+        std::istringstream parser{line};
+        std::string token;
+        parser >> token;
+        if (token == "stop")
+            return true;
+        else if (token == "isready")
+            out << "readyok" << std::endl;
+    }
+    return false;
+}
+
+bool Search::check_time(int changes, int improving)
+{
+    if (total_time != static_cast<std::clock_t>(-1) && !stopped)
+    {
+        int pieces = popcount(position.color_bb[WHITE] | position.color_bb[BLACK]);
+        max_time = std::min(total_time, 23 * total_time / ((3 + ((changes <= 1) * std::max(0, improving - 1))) * (16 + pieces)) + increment);
+        std::clock_t target_time = std::min(
+            max_time,
+            25 * total_time / ((3 + ((changes <= 1) * std::max(0, improving - 1))) * std::min(32 + 19 * pieces, 11 * moves_to_go))
+                    + 16 * increment / (32 + pieces));
+
+        if (std::clock() - start > target_time)
+            stopped = true;
     }
     return stopped;
 }
@@ -1229,7 +1256,7 @@ int Search::qsearch(int ply, int alpha, int beta)
 
     while (Move mv = gen.next())
     {
-        if (is_stopped(true))
+        if (is_stopped())
             return alpha;
 
         if (!checkers && !(type(mv) & PROMOTION) && material[type(position.squares[to(mv)])] < alpha - 70)
@@ -1365,7 +1392,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
             alpha = v;
             best = mv;
         }
-        if (is_stopped(true))
+        if (is_stopped())
             return {alpha, best};
         if (alpha >= beta)
         {
@@ -1413,13 +1440,24 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
 void Search::iterate(int max_depth)
 {
     std::pair<int, Move> best{};
+    int changes = 0;
+    int improving = 0;
+
     for (int depth = 1; depth <= max_depth; ++depth)
     {
         sel_depth = 0;
 
         auto v = search(true, 0, depth, -32767, 32767);
         if (!stopped || !best.second)
+        {
+            if (v.second != best.second)
+                changes++;
+            if (v.first > best.first)
+                improving++;
+            else if (v.first < best.first)
+                improving = 0;
             best = v;
+        }
 
         assert(best.second != NULL_MOVE);
         std::clock_t now = std::clock();
@@ -1437,7 +1475,7 @@ void Search::iterate(int max_depth)
             out << ' ' << pv_lines[0].moves[i];
         out << std::endl;
 
-        if (is_stopped(false))
+        if (check_time(changes, improving))
             break;
     }
     out << "bestmove " << best.second << std::endl;
@@ -1668,7 +1706,7 @@ int main()
             int max_depth = 128;
             std::clock_t time = -1;
             std::clock_t inc = 0;
-            std::clock_t movetime = -1;
+            std::clock_t movetime = std::numeric_limits<std::clock_t>::max();
             int moves_to_go = 10000;
 
             while (parser >> token)

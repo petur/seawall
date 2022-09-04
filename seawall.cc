@@ -1292,13 +1292,32 @@ int Search::qsearch(int ply, int depth, int alpha, int beta)
 
 std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int beta)
 {
+    if (ply > 0)
+    {
+        if (position.halfmove_clock > 100)
+            return {0, NULL_MOVE};
+        if (beta < -32767 + ply)
+            return {beta, NULL_MOVE};
+        BitBoard non_minors = position.type_bb[PAWN] | position.type_bb[ROOK] | position.type_bb[QUEEN];
+        if (ply > 2 && !non_minors)
+        {
+            if (!position.type_bb[BISHOP] && popcount(position.type_bb[KNIGHT]) <= 2)
+                return {0, NULL_MOVE};
+            if (popcount(position.color_bb[WHITE]) <= 2 && popcount(position.color_bb[BLACK]) <= 2)
+                return {0, NULL_MOVE};
+        }
+        if (ply > 2 && alpha > 0 && popcount(position.color_bb[position.next]) <= 2 &&
+                !(position.color_bb[position.next] & non_minors))
+            return {alpha, NULL_MOVE};
+    }
+
     Move prev_best = NULL_MOVE;
     HashEntry* he = load_hash();
     int hv;
     if (he)
     {
         hv = he->get_value(ply);
-        if ((!pv || ply > 0) && he->depth >= depth + pv)
+        if ((!pv || ply > 0) && he->depth >= depth + pv && position.halfmove_clock < 90)
         {
             if (hv >= beta && (he->flags & LOWER))
                 return {beta, he->best_move};
@@ -1412,6 +1431,8 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
             pv_lines[ply].length = 0;
         return {checkers ? -32767 + ply : 0, NULL_MOVE};
     }
+    if (ply > 0 && position.halfmove_clock >= 100)
+        return {0, NULL_MOVE};
 
     assert(alpha > -32767);
     if (alpha >= beta)

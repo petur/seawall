@@ -1259,7 +1259,7 @@ int Search::qsearch(int ply, int alpha, int beta)
         if (is_stopped())
             return alpha;
 
-        if (!checkers && !(type(mv) & PROMOTION) && material[type(position.squares[to(mv)])] < alpha - 70)
+        if (!checkers && !(type(mv) & PROMOTION) && pat + material[type(position.squares[to(mv)])] < alpha - 50)
             continue;
 
         ++nodes;

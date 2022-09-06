@@ -2,7 +2,7 @@ ifeq ($(ARCH),)
 ARCH := native
 endif
 CXXFLAGS = -Wall -Wextra -Werror -std=c++17 -O3 -march=$(ARCH) -mtune=$(ARCH)
-version := $(shell date '+%Y%m%d')
+version := $(shell date '+%Y%m%d')-$(shell git rev-parse --short HEAD)
 branch := $(shell git branch --show-current)
 ifneq ($(branch),main)
 version := $(version)-$(branch)

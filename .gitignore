@@ -1,6 +1,7 @@
 seawall
 seawall.tune
 out/
+branches/
 books/
 samples/
 c-chess-cli.*.log

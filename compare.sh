@@ -13,11 +13,10 @@ done
 
 
 branch=$(git branch --show-current)
-today=$(date '+%Y%m%d')
 
 c-chess-cli \
-    -engine cmd="./out/seawall-${today}-${branch}" \
-    -engine cmd=./out/seawall-${today} \
+    -engine cmd="./branches/seawall-${branch}" \
+    -engine cmd="./branches/seawall-main" \
     -each option.Hash=256 tc="$tc" \
     -openings file=./books/testing.fen order=random \
     -games 20000 -repeat \

@@ -12,13 +12,22 @@ CPPFLAGS += -DSEAWALL_VERSION=$(version)
 
 all:	test $(release)
 
+ifneq ($(branch),)
+branchlink := branches/seawall-$(branch)
+
+all:	$(branchlink)
+
+$(branchlink):	$(release) branches
+	ln -s -f ../$(release) $(branchlink)
+endif
+
 $(release):	seawall out
 	cp seawall $(release)
 
 seawall:	seawall.cc
 
-out:
-	mkdir -p out
+branches out:
+	mkdir -p $@
 
 test:	seawall
 	./test.sh

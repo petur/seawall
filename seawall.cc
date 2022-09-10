@@ -1153,7 +1153,7 @@ struct Search
     bool check_stop_command();
     bool check_time(int changes, int improving);
 
-    int qsearch(int ply, int alpha, int beta);
+    int qsearch(int ply, int depth, int alpha, int beta);
     std::pair<int, Move> search(bool pv, int ply, int depth, int alpha, int beta);
     void iterate(int max_depth);
 
@@ -1228,7 +1228,7 @@ bool Search::check_time(int changes, int improving)
     return stopped;
 }
 
-int Search::qsearch(int ply, int alpha, int beta)
+int Search::qsearch(int ply, int depth, int alpha, int beta)
 {
     assert(ply < 128);
     int orig_alpha = alpha;
@@ -1248,7 +1248,7 @@ int Search::qsearch(int ply, int alpha, int beta)
     if (he)
     {
         best = he->best_move;
-        if ((he->flags & LOWER) && he->get_value(ply) >= beta)
+        if (he->depth >= depth && (he->flags & LOWER) && he->get_value(ply) >= beta)
             return beta;
     }
 
@@ -1262,13 +1262,18 @@ int Search::qsearch(int ply, int alpha, int beta)
         if (!checkers && !(type(mv) & PROMOTION) && pat + material[type(position.squares[to(mv)])] < alpha - 50)
             continue;
 
+        if (!checkers && !(type(mv) & PROMOTION) && mv != best && depth < -1 &&
+                (pawn_attack[position.next][to(mv)] & position.type_bb[PAWN] & position.color_bb[~position.next]) &&
+                material[type(position.squares[from(mv)])] > material[type(position.squares[to(mv)])] + 150)
+            continue;
+
         ++nodes;
         Memo memo = do_move(ply, mv);
         int v;
         if (attackers(from(mv) == king_sq ? to(mv) : king_sq, position.next))
             v = -32767;
         else
-            v = -qsearch(ply + 1, -beta, -alpha);
+            v = -qsearch(ply + 1, std::max(-2, depth - 1), -beta, -alpha);
         undo_move(mv, memo);
 
         if (v > alpha)
@@ -1371,7 +1376,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         }
         else if (new_depth <= 0 && !checkers)
         {
-            v = -qsearch(ply + 1, -beta, -alpha);
+            v = -qsearch(ply + 1, 0, -beta, -alpha);
         }
         else
         {

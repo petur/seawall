@@ -1216,10 +1216,10 @@ bool Search::check_time(int changes, int improving)
     if (total_time != static_cast<std::clock_t>(-1) && !stopped)
     {
         int pieces = popcount(position.color_bb[WHITE] | position.color_bb[BLACK]);
-        max_time = std::min(total_time, 23 * total_time / ((3 + ((changes <= 1) * std::max(0, improving - 1))) * (16 + pieces)) + increment);
+        max_time = std::min(total_time, 26 * total_time / ((4 + ((changes <= 1) * std::max(0, improving - 1))) * (12 + pieces)) + 3 * increment);
         std::clock_t target_time = std::min(
             max_time,
-            25 * total_time / ((3 + ((changes <= 1) * std::max(0, improving - 1))) * std::min(32 + 19 * pieces, 11 * moves_to_go))
+            34 * total_time / ((4 + ((changes <= 1) * std::max(0, improving - 1))) * std::min(32 + 19 * pieces, 11 * moves_to_go))
                     + 16 * increment / (32 + pieces));
 
         if (std::clock() - start > target_time)
@@ -1447,6 +1447,7 @@ void Search::iterate(int max_depth)
     std::pair<int, Move> best{};
     int changes = 0;
     int improving = 0;
+    int last_change = 0;
 
     for (int depth = 1; depth <= max_depth; ++depth)
     {
@@ -1456,13 +1457,19 @@ void Search::iterate(int max_depth)
         if (!stopped || !best.second)
         {
             if (v.second != best.second)
+            {
                 changes++;
+                last_change = depth;
+            }
             if (v.first > best.first)
                 improving++;
             else if (v.first < best.first)
                 improving = 0;
             best = v;
         }
+
+        if (changes > 0 && depth - last_change >= 3)
+            changes--;
 
         assert(best.second != NULL_MOVE);
         std::clock_t now = std::clock();

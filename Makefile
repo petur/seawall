@@ -1,7 +1,7 @@
 ifeq ($(ARCH),)
 ARCH := native
 endif
-CXXFLAGS = -Wall -Wextra -Werror -std=c++17 -O3 -march=$(ARCH) -mtune=$(ARCH)
+CXXFLAGS += -Wall -Wextra -Werror -std=c++17 -Ofast -march=$(ARCH) -mtune=$(ARCH) -flto -fno-rtti -fno-exceptions -fgcse-sm -fgcse-las
 version := $(shell date '+%Y%m%d')-$(shell git rev-parse --short HEAD)
 branch := $(shell git branch --show-current)
 ifneq ($(branch),main)
@@ -35,10 +35,11 @@ test:	seawall
 tune:	seawall.tune
 	cat samples/*.csv | ./seawall.tune
 
+seawall.tune:	CPPFLAGS += -DTUNE=1
 seawall.tune:	seawall.cc
-	$(CXX) $(CXXFLAGS) -DTUNE=1 -o $@ $^
+	$(LINK.cc) $^ -o $@
 
 clean:
-	$(RM) -r seawall seawall.tune out
+	$(RM) -r seawall seawall.tune
 
-.PHONY:	clean
+.PHONY:	all test tune clean

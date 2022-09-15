@@ -13,7 +13,7 @@
 #define STRINGIFY0(x) #x
 #define STRINGIFY(x) STRINGIFY0(x)
 
-constexpr std::uint64_t piece_hash_values[768] =
+constexpr std::uint64_t piece_hash_values[768] alignas(64) =
 {
     0x01510564b3120641, 0x81d4176bde347ed0, 0x87bb68b4058d6c0e, 0x2657ac0ae9cfb089, 0x239bb0832ef29261, 0x59d1f0891d937542,
     0x7bf5a56b5193f6d1, 0xb01171984a82d54d, 0x684643adfab5dd36, 0x56581113fe97511d, 0x2750e3fa9ec1d77e, 0xd8437d4ac7495dff,
@@ -297,7 +297,7 @@ int material[6] = {100, 330, 368, 539, 1061, 100000};
 #ifndef TUNE
 constexpr
 #endif
-int piece_square_table[6][64] =
+int piece_square_table[6][64] alignas(64) =
 {
     {
         0, 0, 0, 0, 0, 0, 0, 0,
@@ -688,12 +688,12 @@ void Position::debug(std::ostream& out)
     out << ' ' << (next == WHITE ? 'w' : 'b') << ' ' << castling << ' ' << en_passant << ' ' << halfmove_clock << " 1\n";
 }
 
-BitBoard knight_attack[64];
-BitBoard king_attack[64];
-BitBoard pawn_attack[2][64];
-BitBoard pawn_push[2][64];
-BitBoard pawn_double_push[2][64];
-BitBoard ray[64][8];
+static BitBoard knight_attack[64] alignas(64);
+static BitBoard king_attack[64] alignas(64);
+static BitBoard pawn_attack[2][64] alignas(64);
+static BitBoard pawn_push[2][64] alignas(64);
+static BitBoard pawn_double_push[2][64] alignas(64);
+static BitBoard ray[64][8] alignas(64);
 
 struct LineMask
 {
@@ -705,7 +705,7 @@ struct LineMask
     LineMask(BitBoard l, BitBoard u) : full{l | u}, lower{l}, upper{u} { }
 };
 
-LineMask line_masks[64][4];
+static LineMask line_masks[64][4] alignas(64);
 
 BitBoard offset_bitboard(int file, int rank, const std::pair<int, int> (&offsets)[8])
 {
@@ -803,7 +803,7 @@ BitBoard attackers(Square sq, Color c)
     );
 }
 
-struct Stack
+struct alignas(16) Stack
 {
     std::uint64_t key;
     Move killer_moves[2];
@@ -849,12 +849,12 @@ struct MoveHistory
     }
 };
 
-MoveHistory history[2][FROM_TO_SIZE];
-MoveHistory capture_history[30][64];
+static MoveHistory history[2][FROM_TO_SIZE] alignas(64);
+static MoveHistory capture_history[30][64] alignas(64);
 
 enum MoveGenType { START, BEST, CAPTURES, QUIETS, END };
 
-struct RankedMove
+struct alignas(4) RankedMove
 {
     Move move;
     std::int16_t rank;
@@ -1047,7 +1047,7 @@ enum HashFlags : std::uint8_t { GEN_MASK = 0x3f, LOWER = 0x40, UPPER = 0x80 };
 
 inline HashFlags& operator|=(HashFlags& lhs, HashFlags rhs) { return lhs = static_cast<HashFlags>(lhs | rhs); }
 
-struct HashEntry
+struct alignas(8) HashEntry
 {
     std::uint16_t key;
     std::int16_t value;
@@ -1067,9 +1067,9 @@ struct HashEntry
     }
 };
 
-HashEntry* hash_table;
-std::size_t hash_size;
-int hash_generation;
+static HashEntry* hash_table;
+static std::size_t hash_size;
+static int hash_generation;
 
 std::size_t hash_index(const Position& position)
 {
@@ -1115,7 +1115,7 @@ struct PvLine
     Move moves[128];
 };
 
-static PvLine pv_lines[128];
+static PvLine pv_lines[128] alignas(64);
 
 void update_pv(Move best_move, int ply, bool end)
 {
@@ -1185,7 +1185,7 @@ bool Search::is_stopped()
     {
         if (std::clock() - start > max_time)
             stopped = true;
-        else if ((nodes & 0xffff) == 0)
+        else if ((nodes & 0x3ffff) == 0)
         {
             if (check_stop_command())
                 stopped = true;
@@ -1532,7 +1532,7 @@ void find_best_value(std::pair<int*, double>& variable, double& best_error, int 
 }
 #endif
 
-const char startfen[] = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+constexpr char startfen[] = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 int main()
 {

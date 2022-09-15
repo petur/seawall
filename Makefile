@@ -1,7 +1,7 @@
 ifeq ($(ARCH),)
 ARCH := native
 endif
-CXXFLAGS += -Wall -Wextra -Werror -std=c++17 -Ofast -march=$(ARCH) -mtune=$(ARCH) -flto -fno-rtti -fno-exceptions -fgcse-sm -fgcse-las
+CXXFLAGS += -Wall -Wextra -Werror -std=c++17 -Ofast -march=$(ARCH) -mtune=$(ARCH) -flto -fno-rtti -fno-exceptions -fgcse-sm -fgcse-las $(PGOFLAGS)
 version := $(shell date '+%Y%m%d')-$(shell git rev-parse --short HEAD)
 branch := $(shell git branch --show-current)
 ifneq ($(branch),main)
@@ -22,11 +22,20 @@ $(branchlink):	$(release) branches
 endif
 
 $(release):	seawall out
-	cp seawall $(release)
+	cp $< $@
 
-seawall:	seawall.cc
+seawall:	seawall.cc profile
+	$(RM) profile/*
+	$(MAKE) PGOFLAGS=-fprofile-generate=./profile profile/seawall
+	./profile.sh profile/seawall
+	$(RM) profile/seawall
+	$(MAKE) PGOFLAGS=-fprofile-use=./profile profile/seawall
+	mv profile/seawall $@
 
-branches out:
+profile/seawall:	seawall.cc
+	$(LINK.cc) $^ -o $@
+
+branches out profile:
 	mkdir -p $@
 
 test:	seawall
@@ -40,6 +49,6 @@ seawall.tune:	seawall.cc
 	$(LINK.cc) $^ -o $@
 
 clean:
-	$(RM) -r seawall seawall.tune
+	$(RM) -r seawall seawall.tune profile
 
 .PHONY:	all test tune clean

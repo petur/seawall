@@ -2,11 +2,15 @@ ifeq ($(ARCH),)
 ARCH := native
 endif
 CXXFLAGS += -Wall -Wextra -Werror -std=c++17 -Ofast -march=$(ARCH) -mtune=$(ARCH) -flto -fno-rtti -fno-exceptions -fgcse-sm -fgcse-las $(PGOFLAGS)
-version := $(shell date '+%Y%m%d')-$(shell git rev-parse --short HEAD)
+version := $(shell date '+%Y%m%d')
+commit := $(shell git rev-parse --short HEAD)
+ifneq ($(commit),)
+version := $(version)-$(commit)
 branch := $(shell git branch --show-current)
 ifneq ($(branch),)
 ifneq ($(branch),main)
 version := $(version)-$(branch)
+endif
 endif
 endif
 release := out/seawall-$(version)$(SUFFIX)

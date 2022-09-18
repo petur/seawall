@@ -8,6 +8,15 @@ Some ideas have been borrowed more directly than others; the obstruction differe
 from [Chess Movegen], while the use of a low pass filter and capture history for move ordering were borrowed from
 [Stockfish].
 
+## Building
+
+To build seawall, run `make` in the source directory.
+
+By default, this will create an executable optimized for the current platform. See the `Makefile` for options that can
+be used to configure the build.
+
+The build only requires Make and a C++17 compiler. It has only been tested with GNU Make and GCC.
+
 [uci]: https://www.chessprogramming.org/UCI
 [chess movegen]: https://github.com/Gigantua/Chess_Movegen
 [stockfish]: https://github.com/official-stockfish/Stockfish

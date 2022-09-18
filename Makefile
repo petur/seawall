@@ -4,8 +4,10 @@ endif
 CXXFLAGS += -Wall -Wextra -Werror -std=c++17 -Ofast -march=$(ARCH) -mtune=$(ARCH) -flto -fno-rtti -fno-exceptions -fgcse-sm -fgcse-las $(PGOFLAGS)
 version := $(shell date '+%Y%m%d')-$(shell git rev-parse --short HEAD)
 branch := $(shell git branch --show-current)
+ifneq ($(branch),)
 ifneq ($(branch),main)
 version := $(version)-$(branch)
+endif
 endif
 release := out/seawall-$(version)$(SUFFIX)
 CPPFLAGS += -DSEAWALL_VERSION=$(version)

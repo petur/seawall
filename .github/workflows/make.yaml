@@ -7,12 +7,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - run: make ARCH=haswell LDFLAGS='-static -s' SUFFIX=-linux
-    - id: date
-      run: date '+::set-output name=date::%Y%m%d'
+    - id: make
+      run: |
+        make ARCH=haswell LDFLAGS='-static -s' SUFFIX=-linux
+        echo "::set-output name=artifact::$(basename out/seawall-*)"
     - uses: actions/upload-artifact@v3
       with:
-        name: seawall-${{ steps.date.outputs.date }}-linux
+        name: ${{ steps.make.outputs.artifact }}
         path: out/seawall-*
 
   make-windows:
@@ -26,12 +27,12 @@ jobs:
           base-devel
           mingw-w64-x86_64-gcc
     - uses: actions/checkout@v3
-    - shell: msys2 {0}
-      run: make ARCH=haswell LDFLAGS='-static -s' SUFFIX=-windows-mingw64
-    - shell: msys2 {0}
-      id: date
-      run: date '+::set-output name=date::%Y%m%d'
+    - id: make
+      shell: msys2 {0}
+      run: |
+        make ARCH=haswell LDFLAGS='-static -s' SUFFIX=-windows-mingw64
+        echo "::set-output name=artifact::$(basename -s .exe out/seawall-*)"
     - uses: actions/upload-artifact@v3
       with:
-        name: seawall-${{ steps.date.outputs.date }}-windows-mingw64
+        name: ${{ steps.make.outputs.artifact }}
         path: out/seawall-*

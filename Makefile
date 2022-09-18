@@ -30,7 +30,7 @@ endif
 $(release):	seawall out
 	cp $< $@
 
-seawall:	seawall.cc profile
+seawall:	seawall.cc | profile
 	$(RM) profile/*
 	$(MAKE) PGOFLAGS=-fprofile-generate=./profile profile/seawall
 	./profile.sh profile/seawall

@@ -1043,6 +1043,9 @@ int evaluate()
     return 15 + position.piece_square_values[position.next] - position.piece_square_values[~position.next];
 }
 
+constexpr int SCORE_MATE = 32767;
+constexpr int SCORE_WIN = 32000;
+
 enum HashFlags : std::uint8_t { GEN_MASK = 0x3f, LOWER = 0x40, UPPER = 0x80 };
 
 inline HashFlags& operator|=(HashFlags& lhs, HashFlags rhs) { return lhs = static_cast<HashFlags>(lhs | rhs); }
@@ -1059,9 +1062,9 @@ struct alignas(8) HashEntry
     int get_value(int ply) const
     {
         int hv = value;
-        if (hv > 32000)
+        if (hv > SCORE_WIN)
             hv -= ply;
-        else if (hv < -32000)
+        else if (hv < -SCORE_WIN)
             hv += ply;
         return hv;
     }
@@ -1090,9 +1093,9 @@ void save_hash(int value, int ply, int depth, Move mv, int alpha, int beta)
         flags |= LOWER;
     if (value < beta)
         flags |= UPPER;
-    if (value > 32000)
+    if (value > SCORE_WIN)
         value += ply;
-    else if (value < -32000)
+    else if (value < -SCORE_WIN)
         value -= ply;
     HashEntry& e = hash_table[hash_index(position)];
     std::uint16_t key = static_cast<std::uint16_t>(position.hash() >> 48);
@@ -1236,7 +1239,7 @@ int Search::qsearch(int ply, int depth, int alpha, int beta)
     Square king_sq = first_square(position.type_bb[KING] & position.color_bb[position.next]);
     BitBoard checkers = attackers(king_sq, ~position.next);
 
-    int pat = checkers ? -32767 + ply : evaluate();
+    int pat = checkers ? -SCORE_MATE + ply : evaluate();
     if (pat >= beta)
         return beta;
     if (pat > alpha)
@@ -1248,8 +1251,12 @@ int Search::qsearch(int ply, int depth, int alpha, int beta)
     if (he)
     {
         best = he->best_move;
-        if (he->depth >= depth && (he->flags & LOWER) && he->get_value(ply) >= beta)
-            return beta;
+        if (he->depth >= depth && (he->flags & LOWER))
+        {
+            int hv = he->get_value(ply);
+            if (hv >= beta && hv < SCORE_MATE - ply)
+                return beta;
+        }
     }
 
     MoveGen gen{checkers ? QUIETS : CAPTURES, best, stack[ply]};
@@ -1271,7 +1278,7 @@ int Search::qsearch(int ply, int depth, int alpha, int beta)
         Memo memo = do_move(ply, mv);
         int v;
         if (attackers(from(mv) == king_sq ? to(mv) : king_sq, position.next))
-            v = -32767;
+            v = -SCORE_MATE;
         else
             v = -qsearch(ply + 1, std::max(-2, depth - 1), -beta, -alpha);
         undo_move(mv, memo);
@@ -1296,7 +1303,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     {
         if (position.halfmove_clock > 100)
             return {0, NULL_MOVE};
-        if (beta < -32767 + ply)
+        if (beta < -SCORE_MATE + ply)
             return {beta, NULL_MOVE};
         BitBoard non_minors = position.type_bb[PAWN] | position.type_bb[ROOK] | position.type_bb[QUEEN];
         if (ply > 2 && !non_minors)
@@ -1317,11 +1324,11 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     if (he)
     {
         hv = he->get_value(ply);
-        if ((!pv || ply > 0) && he->depth >= depth + pv && position.halfmove_clock < 90)
+        if (he->depth >= depth + pv && position.halfmove_clock < 90)
         {
-            if (hv >= beta && (he->flags & LOWER))
+            if (hv >= beta && (he->flags & LOWER) && hv < SCORE_MATE - ply)
                 return {beta, he->best_move};
-            if (hv <= alpha && (he->flags & UPPER))
+            if (hv <= alpha && (he->flags & UPPER) && hv > -SCORE_MATE + ply)
                 return {alpha, he->best_move};
         }
         prev_best = he->best_move;
@@ -1338,6 +1345,8 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
 
     if (ply >= sel_depth)
         sel_depth = ply + 1;
+    if (pv)
+        pv_lines[ply + 1].length = 0;
 
     if (!pv &&
             ply > 1 &&
@@ -1345,7 +1354,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
             depth >= 4 &&
             eval > beta + 50 &&
             !checkers &&
-            alpha > -32000 &&
+            alpha > -SCORE_WIN &&
             popcount(position.color_bb[position.next] & ~position.type_bb[PAWN]) > 1)
     {
         Memo memo = do_move(ply, NULL_MOVE);
@@ -1385,7 +1394,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         int v = beta;
         if (attackers(from(mv) == king_sq ? to(mv) : king_sq, position.next))
         {
-            v = -32767;
+            v = -SCORE_MATE;
             gen.moves[gen.index - 1].move = NULL_MOVE;
             --move_count;
         }
@@ -1426,15 +1435,11 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     }
 
     if (move_count == 0)
-    {
-        if (pv)
-            pv_lines[ply].length = 0;
-        return {checkers ? -32767 + ply : 0, NULL_MOVE};
-    }
+        return {checkers ? -SCORE_MATE + ply : 0, NULL_MOVE};
     if (ply > 0 && position.halfmove_clock >= 100)
         return {0, NULL_MOVE};
 
-    assert(alpha > -32767);
+    assert(alpha > -SCORE_MATE);
     if (alpha >= beta)
     {
         if (!(type(best) & CAPTURE))
@@ -1473,10 +1478,15 @@ void Search::iterate(int max_depth)
     for (int depth = 1; depth <= max_depth; ++depth)
     {
         sel_depth = 0;
+        pv_lines[0].length = 0;
 
-        auto v = search(true, 0, depth, -32767, 32767);
+        auto v = search(true, 0, depth, -SCORE_MATE, SCORE_MATE);
+
         if (!stopped || !best.second)
         {
+            assert(v.first > -SCORE_MATE);
+            assert(v.first < SCORE_MATE);
+
             if (v.second != best.second)
             {
                 changes++;
@@ -1495,10 +1505,10 @@ void Search::iterate(int max_depth)
         assert(best.second != NULL_MOVE);
         std::clock_t now = std::clock();
         out << "info depth " << depth << " seldepth " << sel_depth << " score ";
-        if (best.first > 32000)
-            out << "mate " << ((32767 - best.first + 1) / 2);
-        else if (best.first < -32000)
-            out << "mate " << ((-32767 - best.first) / 2);
+        if (best.first > SCORE_WIN)
+            out << "mate " << ((SCORE_MATE - best.first + 1) / 2);
+        else if (best.first < -SCORE_WIN)
+            out << "mate " << ((-SCORE_MATE - best.first) / 2);
         else
             out << "cp " << best.first;
         out << " nodes " << nodes

@@ -1378,6 +1378,9 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     {
         if (!checkers && move_count && depth <= 5 && eval < alpha - (depth * 240 - 140) && !(type(mv) & (CAPTURE | PROMOTION)))
             continue;
+        if (!checkers && depth <= 5 && alpha > -SCORE_WIN && move_count > 5 + 5 * depth && eval < alpha - 50 * depth &&
+                !(type(mv) & (CAPTURE | PROMOTION)) && mv != prev_best && mv != stack[ply].killer_moves[0] && mv != stack[ply].killer_moves[1])
+            break;
 
         int new_depth = depth + extension - 1;
 

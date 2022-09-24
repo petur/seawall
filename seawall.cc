@@ -1581,6 +1581,8 @@ int main()
     std::ios::sync_with_stdio(false);
     std::string line;
 
+    std::cout << "# seawall " STRINGIFY(SEAWALL_VERSION) << std::endl;
+
 #ifdef TUNE
     int pos_count = 0;
     while (getline(std::cin, line))

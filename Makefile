@@ -40,6 +40,7 @@ seawall:	seawall.cc | profile
 	$(MAKE) PGOFLAGS=-fprofile-generate=./profile profile/seawall
 	./profile.sh profile/seawall
 	$(RM) profile/seawall
+	if $(CXX) --version | grep -q clang; then llvm-profdata merge -o ./profile/default.profdata ./profile; fi
 	$(MAKE) PGOFLAGS=-fprofile-use=./profile profile/seawall
 	mv profile/seawall $@
 

@@ -4,20 +4,19 @@ on: push
 
 jobs:
   make:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-    - id: make
-      run: |
-        make ARCH=haswell LDFLAGS='-static -s' SUFFIX=-linux
-        echo "::set-output name=artifact::$(basename out/seawall-*)"
-    - uses: actions/upload-artifact@v3
-      with:
-        name: ${{ steps.make.outputs.artifact }}
-        path: out/seawall-*
-
-  make-windows:
-    runs-on: windows-latest
+    strategy:
+      matrix:
+        platform:
+        - runner: ubuntu-latest
+          shell: 'bash {0}'
+          suffix: -linux
+        - runner: windows-latest
+          shell: 'msys2 {0}'
+          suffix: -windows-mingw64
+    defaults:
+      run:
+        shell: ${{ matrix.platform.shell }}
+    runs-on: ${{ matrix.platform.runner }}
     steps:
     - uses: msys2/setup-msys2@v2
       with:
@@ -26,11 +25,11 @@ jobs:
           git
           base-devel
           mingw-w64-x86_64-gcc
+      if: ${{ matrix.platform.runner == 'windows-latest' }}
     - uses: actions/checkout@v3
     - id: make
-      shell: msys2 {0}
       run: |
-        make ARCH=haswell LDFLAGS='-static -s' SUFFIX=-windows-mingw64
+        make ARCH=haswell LDFLAGS='-static -s' SUFFIX=${{ matrix.platform.suffix }}
         echo "::set-output name=artifact::$(basename -s .exe out/seawall-*)"
     - uses: actions/upload-artifact@v3
       with:

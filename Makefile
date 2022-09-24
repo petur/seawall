@@ -1,7 +1,7 @@
 ifeq ($(ARCH),)
 ARCH := native
 endif
-CXXFLAGS += -Wall -Wextra -Werror -std=c++17 -Ofast -march=$(ARCH) -mtune=$(ARCH) -flto -fno-rtti -fno-exceptions -fgcse-sm -fgcse-las $(PGOFLAGS)
+CXXFLAGS += -Wall -Wextra -Werror -std=c++17 -Ofast -march=$(ARCH) -mtune=$(ARCH) -flto -fno-rtti -fno-exceptions $(PGOFLAGS)
 
 version :=
 ifeq ($(version),)

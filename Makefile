@@ -21,6 +21,10 @@ endif
 release := out/seawall-$(version)$(SUFFIX)
 CPPFLAGS += -DSEAWALL_VERSION=$(version)
 
+ifeq ($(LLVM_PROFDATA),)
+LLVM_PROFDATA=llvm-profdata
+endif
+
 all:	test $(release)
 
 ifneq ($(branch),)
@@ -40,7 +44,7 @@ seawall:	seawall.cc | profile
 	$(MAKE) PGOFLAGS=-fprofile-generate=./profile profile/seawall
 	./profile.sh profile/seawall
 	$(RM) profile/seawall
-	if $(CXX) --version | grep -q clang; then llvm-profdata merge -o ./profile/default.profdata ./profile; fi
+	if $(CXX) --version | grep -q clang; then $(LLVM_PROFDATA) merge -o ./profile/default.profdata ./profile; fi
 	$(MAKE) PGOFLAGS=-fprofile-use=./profile profile/seawall
 	mv profile/seawall $@
 

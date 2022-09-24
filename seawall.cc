@@ -13,7 +13,7 @@
 #define STRINGIFY0(x) #x
 #define STRINGIFY(x) STRINGIFY0(x)
 
-constexpr std::uint64_t piece_hash_values[768] alignas(64) =
+alignas(64) constexpr std::uint64_t piece_hash_values[768] =
 {
     0x01510564b3120641, 0x81d4176bde347ed0, 0x87bb68b4058d6c0e, 0x2657ac0ae9cfb089, 0x239bb0832ef29261, 0x59d1f0891d937542,
     0x7bf5a56b5193f6d1, 0xb01171984a82d54d, 0x684643adfab5dd36, 0x56581113fe97511d, 0x2750e3fa9ec1d77e, 0xd8437d4ac7495dff,
@@ -294,10 +294,11 @@ constexpr
 #endif
 int material[6] = {100, 332, 368, 541, 1082, 100000};
 
+alignas(64)
 #ifndef TUNE
 constexpr
 #endif
-int piece_square_table[6][64] alignas(64) =
+int piece_square_table[6][64] =
 {
     {
         0, 0, 0, 0, 0, 0, 0, 0,
@@ -688,12 +689,12 @@ void Position::debug(std::ostream& out)
     out << ' ' << (next == WHITE ? 'w' : 'b') << ' ' << castling << ' ' << en_passant << ' ' << halfmove_clock << " 1\n";
 }
 
-static BitBoard knight_attack[64] alignas(64);
-static BitBoard king_attack[64] alignas(64);
-static BitBoard pawn_attack[2][64] alignas(64);
-static BitBoard pawn_push[2][64] alignas(64);
-static BitBoard pawn_double_push[2][64] alignas(64);
-static BitBoard ray[64][8] alignas(64);
+alignas(64) static BitBoard knight_attack[64];
+alignas(64) static BitBoard king_attack[64];
+alignas(64) static BitBoard pawn_attack[2][64];
+alignas(64) static BitBoard pawn_push[2][64];
+alignas(64) static BitBoard pawn_double_push[2][64];
+alignas(64) static BitBoard ray[64][8];
 
 struct LineMask
 {
@@ -705,7 +706,7 @@ struct LineMask
     LineMask(BitBoard l, BitBoard u) : full{l | u}, lower{l}, upper{u} { }
 };
 
-static LineMask line_masks[64][4] alignas(64);
+alignas(64) static LineMask line_masks[64][4];
 
 BitBoard offset_bitboard(int file, int rank, const std::pair<int, int> (&offsets)[8])
 {
@@ -849,8 +850,8 @@ struct MoveHistory
     }
 };
 
-static MoveHistory history[2][FROM_TO_SIZE] alignas(64);
-static MoveHistory capture_history[30][64] alignas(64);
+alignas(64) static MoveHistory history[2][FROM_TO_SIZE];
+alignas(64) static MoveHistory capture_history[30][64] ;
 
 enum MoveGenType { START, BEST, CAPTURES, QUIETS, END };
 
@@ -1118,7 +1119,7 @@ struct PvLine
     Move moves[128];
 };
 
-static PvLine pv_lines[128] alignas(64);
+alignas(64) static PvLine pv_lines[128];
 
 void update_pv(Move best_move, int ply, bool end)
 {
@@ -1654,7 +1655,7 @@ int main()
         std::cout << material[i];
     }
     std::cout << "};" << std::endl;
-    std::cout << "int piece_square_table[6][64] alignas(64) =\n";
+    std::cout << "int piece_square_table[6][64] =\n";
     std::cout << "{\n";
     for (int i = 0; i < 6; i++)
     {

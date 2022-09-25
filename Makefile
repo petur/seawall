@@ -1,3 +1,5 @@
+-include settings.mk
+
 ifeq ($(ARCH),)
 ARCH := native
 endif

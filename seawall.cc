@@ -1163,6 +1163,7 @@ struct Search
 
     int qsearch(int ply, int depth, int alpha, int beta);
     std::pair<int, Move> search(bool pv, int ply, int depth, int alpha, int beta);
+    void print_info(int depth, int score);
     void iterate(int max_depth);
 
     Memo do_move(int ply, Move mv)
@@ -1480,6 +1481,29 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     return {alpha, best};
 }
 
+void Search::print_info(int depth, int score)
+{
+    out << "info depth " << depth << " seldepth " << sel_depth << " score ";
+    if (score > SCORE_WIN)
+        out << "mate " << ((SCORE_MATE - score + 1) / 2);
+    else if (score < -SCORE_WIN)
+        out << "mate " << ((-SCORE_MATE - score) / 2);
+    else
+        out << "cp " << score;
+    double elapsed = static_cast<double>(std::clock() - start) / CLOCKS_PER_SEC;
+    out << " nodes " << nodes
+        << std::fixed << std::setprecision(0) << " time " << (elapsed * 1000.);
+    if (elapsed > 0)
+        out << " nps " << (nodes / elapsed);
+    if (pv_lines[0].length > 0)
+    {
+        out << " pv";
+        for (int i = 0; i < pv_lines[0].length; i++)
+            out << ' ' << pv_lines[0].moves[i];
+    }
+    out << std::endl;
+}
+
 void Search::iterate(int max_depth)
 {
     std::pair<int, Move> best{};
@@ -1515,20 +1539,7 @@ void Search::iterate(int max_depth)
             changes--;
 
         assert(best.second != NULL_MOVE);
-        std::clock_t now = std::clock();
-        out << "info depth " << depth << " seldepth " << sel_depth << " score ";
-        if (best.first > SCORE_WIN)
-            out << "mate " << ((SCORE_MATE - best.first + 1) / 2);
-        else if (best.first < -SCORE_WIN)
-            out << "mate " << ((-SCORE_MATE - best.first) / 2);
-        else
-            out << "cp " << best.first;
-        out << " nodes " << nodes
-            << std::fixed << std::setprecision(0) << " time " << (static_cast<double>(now - start) * 1000. / CLOCKS_PER_SEC)
-            << " nps " << (nodes * CLOCKS_PER_SEC / static_cast<double>(now - start)) << " pv";
-        for (int i = 0; i < pv_lines[0].length; i++)
-            out << ' ' << pv_lines[0].moves[i];
-        out << std::endl;
+        print_info(depth, best.first);
 
         if (check_time(changes, improving))
             break;

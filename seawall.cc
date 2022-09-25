@@ -1229,10 +1229,10 @@ bool Search::check_time(int changes, int improving)
     if (total_time != static_cast<std::clock_t>(-1) && !stopped)
     {
         int pieces = popcount(position.color_bb[WHITE] | position.color_bb[BLACK]);
-        max_time = std::min(total_time, 26 * total_time / ((4 + ((changes <= 1) * std::max(0, improving - 1))) * (12 + pieces)) + 3 * increment);
+        max_time = std::min(total_time, 24 * total_time / ((4 + ((changes <= 1) * std::max(0, improving - 1))) * (16 + pieces)) + 4 * increment);
         std::clock_t target_time = std::min(
             max_time,
-            34 * total_time / ((4 + ((changes <= 1) * std::max(0, improving - 1))) * std::min(32 + 19 * pieces, 11 * moves_to_go))
+            36 * total_time / ((4 + ((changes <= 1) * std::max(0, improving - 1))) * std::min(32 + 19 * pieces, 11 * moves_to_go))
                     + 16 * increment / (32 + pieces));
 
         if (std::clock() - start > target_time)
@@ -1433,13 +1433,16 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
 
         undo_move(mv, memo);
 
+        if (is_stopped())
+            return {alpha, best};
         if (v > alpha)
         {
             alpha = v;
             best = mv;
+
+            if (pv && ply == 0 && alpha < beta)
+                update_pv(best, ply, depth <= 1);
         }
-        if (is_stopped())
-            return {alpha, best};
         if (alpha >= beta)
         {
             alpha = beta;
@@ -1510,15 +1513,15 @@ void Search::iterate(int max_depth)
     int changes = 0;
     int improving = 0;
     int last_change = 0;
+    pv_lines[0].length = 0;
 
     for (int depth = 1; depth <= max_depth; ++depth)
     {
         sel_depth = 0;
-        pv_lines[0].length = 0;
 
         auto v = search(true, 0, depth, -SCORE_MATE, SCORE_MATE);
 
-        if (!stopped || !best.second)
+        if (v.second)
         {
             assert(v.first > -SCORE_MATE);
             assert(v.first < SCORE_MATE);

@@ -19,9 +19,9 @@ jobs:
           llvm_profdata: llvm-profdata-14
         - runner: windows-latest
           shell: 'msys2 {0}'
-          suffix: -windows-mingw64
-          cxx: g++
-          llvm_profdata: ''
+          suffix: -windows-clang
+          cxx: clang++
+          llvm_profdata: llvm-profdata
     defaults:
       run:
         shell: ${{ matrix.platform.shell }}
@@ -29,16 +29,19 @@ jobs:
     steps:
     - uses: msys2/setup-msys2@v2
       with:
-        msystem: mingw64
+        msystem: clang64
         install: >-
           git
           base-devel
-          mingw-w64-x86_64-gcc
+          mingw-w64-clang-x86_64-clang
+          mingw-w64-clang-x86_64-compiler-rt
+          mingw-w64-clang-x86_64-lld
       if: ${{ matrix.platform.runner == 'windows-latest' }}
     - uses: actions/checkout@v3
     - id: make
       run: |
-        make CXX=${{ matrix.platform.cxx }} LLVM_PROFDATA=${{ matrix.platform.llvm_profdata }} ARCH=haswell LDFLAGS='-static -s' SUFFIX=${{ matrix.platform.suffix }}
+        make CXX=${{ matrix.platform.cxx }} LLVM_PROFDATA=${{ matrix.platform.llvm_profdata }} \
+          ARCH=haswell LDFLAGS='-static -s' SUFFIX=${{ matrix.platform.suffix }}
         echo "::set-output name=artifact::$(basename -s .exe out/seawall-*)"
     - uses: actions/upload-artifact@v3
       with:

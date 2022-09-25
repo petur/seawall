@@ -2,6 +2,7 @@
 #include <cassert>
 #include <cmath>
 #include <ctime>
+#include <deque>
 #include <iomanip>
 #include <iostream>
 #include <limits>
@@ -1140,6 +1141,7 @@ struct Search
 {
     std::istream& in;
     std::ostream& out;
+    std::deque<std::string>& commands;
     std::clock_t total_time;
     std::clock_t increment;
     std::clock_t movetime;
@@ -1151,7 +1153,9 @@ struct Search
     bool stopped;
     Stack* stack;
 
-    Search(std::istream& i, std::ostream& o, std::clock_t time, std::clock_t inc, std::clock_t movetime, int moves_to_go, Stack* stack);
+    Search(
+        std::istream& i, std::ostream& o, std::deque<std::string>& cmd,
+        std::clock_t time, std::clock_t inc, std::clock_t movetime, int moves_to_go, Stack* stack);
 
     bool is_stopped();
     bool check_stop_command();
@@ -1172,8 +1176,10 @@ struct Search
     void undo_move(Move mv, const Memo& memo) { position.undo_move(mv, memo); }
 };
 
-Search::Search(std::istream& i, std::ostream& o, std::clock_t time, std::clock_t inc, std::clock_t mt, int mtg, Stack* st)
-    : in{i}, out{o}, total_time{time}, increment{inc}, movetime{mt}, moves_to_go{mtg}, max_time{mt},
+Search::Search(
+    std::istream& i, std::ostream& o, std::deque<std::string>& cmd,
+    std::clock_t time, std::clock_t inc, std::clock_t mt, int mtg, Stack* st)
+    : in{i}, out{o}, commands{cmd}, total_time{time}, increment{inc}, movetime{mt}, moves_to_go{mtg}, max_time{mt},
     start{std::clock()}, nodes{}, sel_depth{}, stopped{}, stack{st}
 {
     if (total_time != static_cast<std::clock_t>(-1))
@@ -1211,6 +1217,8 @@ bool Search::check_stop_command()
             return true;
         else if (token == "isready")
             out << "readyok" << std::endl;
+        else
+            commands.push_back(line);
     }
     return false;
 }
@@ -1577,6 +1585,15 @@ bool find_best_value(std::pair<int*, double>& variable, double& best_error, int 
 
 constexpr char startfen[] = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
+bool get_command(std::istream& in, std::deque<std::string>& commands, std::string& line)
+{
+    if (commands.empty())
+        return static_cast<bool>(getline(in, line));
+    line = commands.front();
+    commands.pop_front();
+    return true;
+}
+
 int main()
 {
     std::ios::sync_with_stdio(false);
@@ -1675,8 +1692,9 @@ int main()
     std::size_t hash_mb = 1;
     bool debug = false;
     Stack stack[256] = {};
+    std::deque<std::string> commands;
 
-    while (getline(std::cin, line))
+    while (get_command(std::cin, commands, line))
     {
         std::istringstream parser{line};
         std::string token;
@@ -1793,7 +1811,7 @@ int main()
             }
 
             ++hash_generation;
-            Search{std::cin, std::cout, time, inc, movetime, moves_to_go, &stack[position.halfmove_clock]}.iterate(max_depth);
+            Search{std::cin, std::cout, commands, time, inc, movetime, moves_to_go, &stack[position.halfmove_clock]}.iterate(max_depth);
         }
         else if (token == "quit")
         {

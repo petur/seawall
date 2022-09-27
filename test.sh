@@ -42,5 +42,11 @@ echo 'position fen rn1qkb1r/1pp2pP1/3p4/p5Bp/4P3/2N5/PPP2PPP/R2bKB1R b KQkq - 0 
 echo 'go wtime 2404 winc 30 btime 2503 binc 30'
 echo 'position fen rn2kb2/p3p1p1/2p1r3/1P2q3/3PBPb1/4Q2p/1P1P2PP/R1B1K2R w KQq - 0 17'
 echo 'go wtime 2095 winc 30 btime 1849 binc 30'
+echo 'position fen Q7/2R5/3K4/8/3P4/5k2/3r4/8 b - - 0 76 moves f3g4 a8c8'
+echo 'go wtime 1 winc 0 btime 0 binc 0 movestogo 925'
+echo 'position fen 8/8/p4Bp1/2b5/2k5/8/8/3K1q2 w - - 0 60'
+echo 'go wtime 5 winc 0 btime 11 binc 0 movestogo 947'
+echo 'position fen Q5k1/1K6/1Q6/3p4/2q5/8/4q3/8 b - - 0 71'
+echo 'go wtime 1 winc 0 btime 0 binc 0 movestogo 931'
 echo 'quit'
 ) | ./seawall

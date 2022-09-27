@@ -1151,6 +1151,7 @@ struct Search
     long long nodes;
     int sel_depth;
     bool stopped;
+    Move best_move;
     Stack* stack;
 
     Search(
@@ -1181,7 +1182,7 @@ Search::Search(
     std::istream& i, std::ostream& o, std::deque<std::string>& cmd,
     std::clock_t time, std::clock_t inc, std::clock_t mt, int mtg, Stack* st)
     : in{i}, out{o}, commands{cmd}, total_time{time}, increment{inc}, movetime{mt}, moves_to_go{mtg}, max_time{mt},
-    start{std::clock()}, nodes{}, sel_depth{}, stopped{}, stack{st}
+    start{std::clock()}, nodes{}, sel_depth{}, stopped{}, best_move{}, stack{st}
 {
     if (total_time != static_cast<std::clock_t>(-1))
     {
@@ -1434,7 +1435,13 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         undo_move(mv, memo);
 
         if (is_stopped())
-            return {alpha, best};
+        {
+            if (best)
+                return {alpha, best};
+            if (ply > 0 || best_move)
+                return {0, NULL_MOVE};
+        }
+
         if (v > alpha)
         {
             alpha = v;
@@ -1509,7 +1516,7 @@ void Search::print_info(int depth, int score)
 
 void Search::iterate(int max_depth)
 {
-    std::pair<int, Move> best{};
+    int best_score = 0;
     int changes = 0;
     int improving = 0;
     int last_change = 0;
@@ -1526,28 +1533,29 @@ void Search::iterate(int max_depth)
             assert(v.first > -SCORE_MATE);
             assert(v.first < SCORE_MATE);
 
-            if (v.second != best.second)
+            if (v.second != best_move)
             {
                 changes++;
                 last_change = depth;
             }
-            if (v.first > best.first)
+            if (v.first > best_score)
                 improving++;
-            else if (v.first < best.first)
+            else if (v.first < best_score)
                 improving = 0;
-            best = v;
+            best_score = v.first;
+            best_move = v.second;
         }
 
         if (changes > 0 && depth - last_change >= 3)
             changes--;
 
-        assert(best.second != NULL_MOVE);
-        print_info(depth, best.first);
+        assert(best_move != NULL_MOVE);
+        print_info(depth, best_score);
 
         if (check_time(changes, improving))
             break;
     }
-    out << "bestmove " << best.second << std::endl;
+    out << "bestmove " << best_move << std::endl;
 }
 
 #ifdef TUNE

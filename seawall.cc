@@ -369,6 +369,109 @@ int piece_square_value(Square sq, Color c, PieceType t)
     return material[t] + piece_square_table[t][sq ^ flip];
 }
 
+alignas(64) static BitBoard knight_attack[64];
+alignas(64) static BitBoard king_attack[64];
+alignas(64) static BitBoard pawn_attack[2][64];
+alignas(64) static BitBoard pawn_push[2][64];
+alignas(64) static BitBoard pawn_double_push[2][64];
+alignas(64) static BitBoard ray[64][8];
+
+struct LineMask
+{
+    BitBoard full;
+    BitBoard lower;
+    BitBoard upper;
+
+    LineMask() : full{}, lower{}, upper{} { }
+    LineMask(BitBoard l, BitBoard u) : full{l | u}, lower{l}, upper{u} { }
+};
+
+alignas(64) static LineMask line_masks[64][4];
+
+BitBoard offset_bitboard(int file, int rank, const std::pair<int, int> (&offsets)[8])
+{
+    BitBoard ret{};
+    for (auto off : offsets)
+    {
+        if (file + off.first >= 0 && file + off.first <= 7 && rank + off.second >= 0 && rank + off.second <= 7)
+            ret |= square(file + off.first, rank + off.second);
+    }
+    return ret;
+}
+
+void init_bitboards()
+{
+    constexpr std::pair<int, int> knight_offsets[8] = {{-2, -1}, {-1, -2}, {2, -1}, {-1, 2}, {-2, 1}, {1, -2}, {2, 1}, {1, 2}};
+    constexpr std::pair<int, int> king_offsets[8] = {{-1, -1}, {-1, 0}, {-1, 1}, {0, -1}, {0, 1}, {1, -1}, {1, 0}, {1, 1}};
+    constexpr std::pair<int, int> ray_offsets[8] = {{-1, -1}, {-1, 0}, {-1, 1}, {0, 1}, {1, 1}, {1, 0}, {1, -1}, {0, -1}};
+
+    for (Square sq = A1; sq <= H8; sq++)
+    {
+        int file = sq & 7;
+        int rank = sq >> 3;
+
+        knight_attack[sq] = offset_bitboard(file, rank, knight_offsets);
+        king_attack[sq] = offset_bitboard(file, rank, king_offsets);
+
+        for (Color c : {WHITE, BLACK})
+        {
+            if (rank == (c == WHITE ? 7 : 0))
+                continue;
+            if (file > 0)
+                pawn_attack[c][sq] |= static_cast<Square>(sq - 1 + rank_fwd(c));
+            if (file < 7)
+                pawn_attack[c][sq] |= static_cast<Square>(sq + 1 + rank_fwd(c));
+
+            pawn_push[c][sq] = bb(static_cast<Square>(sq + rank_fwd(c)));
+
+            if (rank == (c == WHITE ? 1 : 6))
+                pawn_double_push[c][sq] = bb(static_cast<Square>(sq + 2 * rank_fwd(c)));
+        }
+
+        for (int i = 0; i < 8; ++i)
+        {
+            auto off = ray_offsets[i];
+            int f = file + off.first;
+            int r = rank + off.second;
+            while (f >= 0 && f <= 7 && r >= 0 && r <= 7)
+            {
+                ray[sq][i] |= square(f, r);
+                f += off.first;
+                r += off.second;
+            }
+        }
+
+        line_masks[sq][0] = {ray[sq][0], ray[sq][4]};
+        line_masks[sq][1] = {ray[sq][6], ray[sq][2]};
+        line_masks[sq][2] = {ray[sq][1], ray[sq][5]};
+        line_masks[sq][3] = {ray[sq][7], ray[sq][3]};
+    }
+}
+
+BitBoard line_attack(BitBoard blockers, const LineMask& lm)
+{
+    BitBoard lower = lm.lower & blockers;
+    BitBoard upper = lm.upper & blockers;
+    return static_cast<BitBoard>(lm.full & (upper ^ (upper - (0x8000000000000000ULL >> __builtin_clzll(lower | 1)))));
+}
+
+BitBoard bishop_attack(Square sq, BitBoard blockers)
+{
+    return line_attack(blockers, line_masks[sq][0])
+        | line_attack(blockers, line_masks[sq][1]);
+}
+
+BitBoard rook_attack(Square sq, BitBoard blockers)
+{
+    return line_attack(blockers, line_masks[sq][2])
+        | line_attack(blockers, line_masks[sq][3]);
+}
+
+BitBoard queen_attack(Square sq, BitBoard blockers)
+{
+    return bishop_attack(sq, blockers) | rook_attack(sq, blockers);
+}
+
 struct Memo
 {
     Piece moved;
@@ -460,7 +563,11 @@ Memo Position::do_move(Move mv)
         {
             halfmove_clock = 0;
             if (mt == EN_PASSANT)
-                en_passant = static_cast<Square>(from(mv) + rank_fwd(next));
+            {
+                Square ep = static_cast<Square>(from(mv) + rank_fwd(next));
+                if (pawn_attack[next][ep] & type_bb[PAWN] & color_bb[~next])
+                    en_passant = ep;
+            }
         }
         if (mt == CASTLING)
         {
@@ -690,109 +797,6 @@ void Position::debug(std::ostream& out)
     out << ' ' << (next == WHITE ? 'w' : 'b') << ' ' << castling << ' ' << en_passant << ' ' << halfmove_clock << " 1\n";
 }
 
-alignas(64) static BitBoard knight_attack[64];
-alignas(64) static BitBoard king_attack[64];
-alignas(64) static BitBoard pawn_attack[2][64];
-alignas(64) static BitBoard pawn_push[2][64];
-alignas(64) static BitBoard pawn_double_push[2][64];
-alignas(64) static BitBoard ray[64][8];
-
-struct LineMask
-{
-    BitBoard full;
-    BitBoard lower;
-    BitBoard upper;
-
-    LineMask() : full{}, lower{}, upper{} { }
-    LineMask(BitBoard l, BitBoard u) : full{l | u}, lower{l}, upper{u} { }
-};
-
-alignas(64) static LineMask line_masks[64][4];
-
-BitBoard offset_bitboard(int file, int rank, const std::pair<int, int> (&offsets)[8])
-{
-    BitBoard ret{};
-    for (auto off : offsets)
-    {
-        if (file + off.first >= 0 && file + off.first <= 7 && rank + off.second >= 0 && rank + off.second <= 7)
-            ret |= square(file + off.first, rank + off.second);
-    }
-    return ret;
-}
-
-void init_bitboards()
-{
-    constexpr std::pair<int, int> knight_offsets[8] = {{-2, -1}, {-1, -2}, {2, -1}, {-1, 2}, {-2, 1}, {1, -2}, {2, 1}, {1, 2}};
-    constexpr std::pair<int, int> king_offsets[8] = {{-1, -1}, {-1, 0}, {-1, 1}, {0, -1}, {0, 1}, {1, -1}, {1, 0}, {1, 1}};
-    constexpr std::pair<int, int> ray_offsets[8] = {{-1, -1}, {-1, 0}, {-1, 1}, {0, 1}, {1, 1}, {1, 0}, {1, -1}, {0, -1}};
-
-    for (Square sq = A1; sq <= H8; sq++)
-    {
-        int file = sq & 7;
-        int rank = sq >> 3;
-
-        knight_attack[sq] = offset_bitboard(file, rank, knight_offsets);
-        king_attack[sq] = offset_bitboard(file, rank, king_offsets);
-
-        for (Color c : {WHITE, BLACK})
-        {
-            if (rank == (c == WHITE ? 7 : 0))
-                continue;
-            if (file > 0)
-                pawn_attack[c][sq] |= static_cast<Square>(sq - 1 + rank_fwd(c));
-            if (file < 7)
-                pawn_attack[c][sq] |= static_cast<Square>(sq + 1 + rank_fwd(c));
-
-            pawn_push[c][sq] = bb(static_cast<Square>(sq + rank_fwd(c)));
-
-            if (rank == (c == WHITE ? 1 : 6))
-                pawn_double_push[c][sq] = bb(static_cast<Square>(sq + 2 * rank_fwd(c)));
-        }
-
-        for (int i = 0; i < 8; ++i)
-        {
-            auto off = ray_offsets[i];
-            int f = file + off.first;
-            int r = rank + off.second;
-            while (f >= 0 && f <= 7 && r >= 0 && r <= 7)
-            {
-                ray[sq][i] |= square(f, r);
-                f += off.first;
-                r += off.second;
-            }
-        }
-
-        line_masks[sq][0] = {ray[sq][0], ray[sq][4]};
-        line_masks[sq][1] = {ray[sq][6], ray[sq][2]};
-        line_masks[sq][2] = {ray[sq][1], ray[sq][5]};
-        line_masks[sq][3] = {ray[sq][7], ray[sq][3]};
-    }
-}
-
-BitBoard line_attack(BitBoard blockers, const LineMask& lm)
-{
-    BitBoard lower = lm.lower & blockers;
-    BitBoard upper = lm.upper & blockers;
-    return static_cast<BitBoard>(lm.full & (upper ^ (upper - (0x8000000000000000ULL >> __builtin_clzll(lower | 1)))));
-}
-
-BitBoard bishop_attack(Square sq, BitBoard blockers)
-{
-    return line_attack(blockers, line_masks[sq][0])
-        | line_attack(blockers, line_masks[sq][1]);
-}
-
-BitBoard rook_attack(Square sq, BitBoard blockers)
-{
-    return line_attack(blockers, line_masks[sq][2])
-        | line_attack(blockers, line_masks[sq][3]);
-}
-
-BitBoard queen_attack(Square sq, BitBoard blockers)
-{
-    return bishop_attack(sq, blockers) | rook_attack(sq, blockers);
-}
-
 BitBoard attackers(Square sq, Color c)
 {
     return position.color_bb[c] & (
@@ -852,7 +856,7 @@ struct MoveHistory
 };
 
 alignas(64) static MoveHistory history[2][FROM_TO_SIZE];
-alignas(64) static MoveHistory capture_history[30][64] ;
+alignas(64) static MoveHistory capture_history[30][64];
 
 enum MoveGenType { START, BEST, CAPTURES, QUIETS, END };
 
@@ -874,11 +878,12 @@ struct MoveGen
     RankedMove moves[256];
     int count;
     int index;
+    BitBoard checkers;
     Move best_move;
     const Stack& stack;
 
-    explicit MoveGen(MoveGenType w, Move best, const Stack& st)
-        : wanted{w}, generated{}, moves{}, count{}, index{}, best_move{best}, stack{st} {}
+    explicit MoveGen(MoveGenType w, BitBoard ch, Move best, const Stack& st)
+        : wanted{w}, generated{}, moves{}, count{}, index{}, checkers{ch}, best_move{best}, stack{st} {}
 
     Move next();
 
@@ -1022,12 +1027,30 @@ void MoveGen::generate()
         from_mask = bb(from(best_move));
         to_mask = bb(to(best_move));
     }
+    BitBoard king_to_mask = to_mask;
+    if (generated != BEST && checkers)
+    {
+        if (gen == CAPTURES)
+            to_mask &= checkers | ((checkers & position.type_bb[PAWN]) && position.en_passant ? bb(position.en_passant) : EMPTY);
+        else if (checkers & (position.type_bb[PAWN] | position.type_bb[KNIGHT]))
+            to_mask = EMPTY;
+        else
+        {
+            Square king_sq = first_square(position.type_bb[KING] & position.color_bb[position.next]);
+            if (checkers & position.type_bb[BISHOP])
+                to_mask &= bishop_attack(king_sq, position.all_bb());
+            else if (checkers & position.type_bb[ROOK])
+                to_mask &= rook_attack(king_sq, position.all_bb());
+            else if (checkers & position.type_bb[QUEEN])
+                to_mask &= queen_attack(king_sq, position.all_bb());
+        }
+    }
     generate_pieces<PAWN>(gen, from_mask, to_mask);
     generate_pieces<KNIGHT>(gen, from_mask, to_mask);
     generate_pieces<BISHOP>(gen, from_mask, to_mask);
     generate_pieces<ROOK>(gen, from_mask, to_mask);
     generate_pieces<QUEEN>(gen, from_mask, to_mask);
-    generate_pieces<KING>(gen, from_mask, to_mask);
+    generate_pieces<KING>(gen, from_mask, king_to_mask);
     std::sort(&moves[index], &moves[count]);
 }
 
@@ -1270,7 +1293,7 @@ int Search::qsearch(int ply, int depth, int alpha, int beta)
         }
     }
 
-    MoveGen gen{checkers ? QUIETS : CAPTURES, best, stack[ply]};
+    MoveGen gen{checkers ? QUIETS : CAPTURES, checkers, best, stack[ply]};
 
     while (Move mv = gen.next())
     {
@@ -1376,7 +1399,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
             return {beta, NULL_MOVE};
     }
 
-    MoveGen gen{QUIETS, prev_best, stack[ply]};
+    MoveGen gen{QUIETS, checkers, prev_best, stack[ply]};
     Move best = NULL_MOVE;
     int orig_alpha = alpha;
 

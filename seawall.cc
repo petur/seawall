@@ -1396,7 +1396,11 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         int v = -search(false, ply + 1, depth - 2 - (eval - beta) / 200, -beta, -beta + 1).first;
         undo_move(NULL_MOVE, memo);
         if (v >= beta)
-            return {beta, NULL_MOVE};
+        {
+            v = search(false, ply, (depth - 1) / 2, beta - 1, beta).first;
+            if (v >= beta)
+                return {beta, NULL_MOVE};
+        }
     }
 
     MoveGen gen{QUIETS, checkers, prev_best, stack[ply]};

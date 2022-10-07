@@ -946,6 +946,25 @@ BitBoard attackers(Square sq, Color c)
     );
 }
 
+bool is_check(Move mv, Square king_sq)
+{
+    switch (type(position.squares[from(mv)]))
+    {
+        case PAWN:
+            return pawn_attack[position.next][to(mv)] & king_sq;
+        case KNIGHT:
+            return knight_attack[to(mv)] & king_sq;
+        case BISHOP:
+            return bishop_attack(to(mv), position.all_bb()) & king_sq;
+        case ROOK:
+            return rook_attack(to(mv), position.all_bb()) & king_sq;
+        case QUEEN:
+            return (bishop_attack(to(mv), position.all_bb()) | rook_attack(to(mv), position.all_bb())) & king_sq;
+        default:
+            return false;
+    }
+}
+
 struct alignas(16) Stack
 {
     std::uint64_t key;
@@ -1700,15 +1719,17 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     MoveGen gen{QUIETS, checkers, prev_best, stack[ply]};
     Move best = NULL_MOVE;
     int orig_alpha = alpha;
+    Square opp_king_sq = first_square(position.type_bb[KING] & position.color_bb[~position.next]);
 
     int move_count = 0;
     int mcp = 0;
 
     while (Move mv = gen.next())
     {
-        if (!checkers && move_count && depth <= 5 && eval < alpha - (depth * 223 - 141) && !(type(mv) & (CAPTURE | PROMOTION)))
+        bool checks = is_check(mv, opp_king_sq);
+        if (!checkers && !checks && move_count && depth <= 5 && eval < alpha - (depth * 223 - 141) && !(type(mv) & (CAPTURE | PROMOTION)))
             continue;
-        if (!checkers && depth <= 5 && alpha > -SCORE_WIN && eval < alpha - 32 - 23 * depth &&
+        if (!checkers && !checks && depth <= 5 && alpha > -SCORE_WIN && eval < alpha - 32 - 23 * depth &&
                 !(type(mv) & (CAPTURE | PROMOTION)) && mv != prev_best && mv != stack[ply].killer_moves[0] && mv != stack[ply].killer_moves[1])
         {
             ++mcp;

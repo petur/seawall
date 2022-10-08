@@ -1172,6 +1172,7 @@ struct Search
     std::clock_t max_time;
     std::clock_t start;
     long long nodes;
+    int root_depth;
     int sel_depth;
     bool stopped;
     Move best_move;
@@ -1205,7 +1206,7 @@ Search::Search(
     std::istream& i, std::ostream& o, std::deque<std::string>& cmd,
     std::clock_t time, std::clock_t inc, std::clock_t mt, int mtg, Stack* st)
     : in{i}, out{o}, commands{cmd}, total_time{time}, increment{inc}, movetime{mt}, moves_to_go{mtg}, max_time{mt},
-    start{std::clock()}, nodes{}, sel_depth{}, stopped{}, best_move{}, stack{st}
+    start{std::clock()}, nodes{}, root_depth{}, sel_depth{}, stopped{}, best_move{}, stack{st}
 {
     if (total_time != static_cast<std::clock_t>(-1))
     {
@@ -1408,9 +1409,6 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     int orig_alpha = alpha;
 
     int move_count = 0;
-    int extension = 0;
-    if (checkers)
-        extension++;
 
     while (Move mv = gen.next())
     {
@@ -1420,6 +1418,13 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
                 !(type(mv) & (CAPTURE | PROMOTION)) && mv != prev_best && mv != stack[ply].killer_moves[0] && mv != stack[ply].killer_moves[1])
             break;
 
+        int extension = 0;
+        if (checkers)
+            extension++;
+        else if (!(type(mv) & CAPTURE) && type(position.squares[from(mv)]) == PAWN && ply < 2 * root_depth &&
+                (bb(to(mv)) & (position.next == WHITE ? 0x00ffffff00000000ULL : 0x00000000ffffff00ULL)) &&
+                 !(ray[to(mv)][position.next == WHITE ? 5 : 1] & position.type_bb[PAWN]))
+            extension++;
         int new_depth = depth + extension - 1;
 
         int reduction = 0;
@@ -1549,11 +1554,11 @@ void Search::iterate(int max_depth)
     int last_change = 0;
     pv_lines[0].length = 0;
 
-    for (int depth = 1; depth <= max_depth; ++depth)
+    for (root_depth = 1; root_depth <= max_depth; ++root_depth)
     {
         sel_depth = 0;
 
-        auto v = search(true, 0, depth, -SCORE_MATE, SCORE_MATE);
+        auto v = search(true, 0, root_depth, -SCORE_MATE, SCORE_MATE);
 
         if (v.second)
         {
@@ -1563,7 +1568,7 @@ void Search::iterate(int max_depth)
             if (v.second != best_move)
             {
                 changes++;
-                last_change = depth;
+                last_change = root_depth;
             }
             if (v.first > best_score)
                 improving++;
@@ -1573,11 +1578,11 @@ void Search::iterate(int max_depth)
             best_move = v.second;
         }
 
-        if (changes > 0 && depth - last_change >= 3)
+        if (changes > 0 && root_depth - last_change >= 3)
             changes--;
 
         assert(best_move != NULL_MOVE);
-        print_info(depth, best_score);
+        print_info(root_depth, best_score);
 
         if (check_time(changes, improving))
             break;

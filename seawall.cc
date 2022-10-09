@@ -1137,6 +1137,17 @@ HashEntry* load_hash()
     return e;
 }
 
+int hash_usage()
+{
+    int r = 0;
+    for (int i = 0; i < 1000; i++)
+    {
+        if (hash_table[i].generation() == hash_generation)
+            r++;
+    }
+    return r;
+}
+
 struct PvLine
 {
     int length;
@@ -1537,6 +1548,7 @@ void Search::print_info(int depth, int score)
         << std::fixed << std::setprecision(0) << " time " << (elapsed * 1000.);
     if (elapsed > 0)
         out << " nps " << (nodes / elapsed);
+    out << " hashfull " << hash_usage();
     if (pv_lines[0].length > 0)
     {
         out << " pv";

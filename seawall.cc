@@ -1420,14 +1420,19 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     int orig_alpha = alpha;
 
     int move_count = 0;
+    int mcp = 0;
 
     while (Move mv = gen.next())
     {
         if (!checkers && move_count && depth <= 5 && eval < alpha - (depth * 240 - 140) && !(type(mv) & (CAPTURE | PROMOTION)))
             continue;
-        if (!checkers && depth <= 5 && alpha > -SCORE_WIN && move_count > 5 + 5 * depth && eval < alpha - 50 * depth &&
+        if (!checkers && depth <= 5 && alpha > -SCORE_WIN && eval < alpha - 25 - 25 * depth &&
                 !(type(mv) & (CAPTURE | PROMOTION)) && mv != prev_best && mv != stack[ply].killer_moves[0] && mv != stack[ply].killer_moves[1])
-            break;
+        {
+            ++mcp;
+            if (mcp > 4 * (depth - 1) + 2)
+                break;
+        }
 
         int extension = 0;
         if (checkers)

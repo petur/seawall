@@ -1437,6 +1437,9 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         int extension = 0;
         if (checkers)
             extension++;
+        else if (depth <= 2 && ply < 2 * root_depth && (type(mv) & CAPTURE) && (type(stack[ply].prev_move) & CAPTURE) &&
+                to(mv) == to(stack[ply].prev_move) && eval + material[type(position.squares[to(mv)])] > alpha - 25 && eval < beta + 25)
+            extension++;
         else if (!(type(mv) & CAPTURE) && type(position.squares[from(mv)]) == PAWN && ply < 2 * root_depth &&
                 (bb(to(mv)) & (position.next == WHITE ? 0x00ffffff00000000ULL : 0x00000000ffffff00ULL)) &&
                  !(ray[to(mv)][position.next == WHITE ? 5 : 1] & position.type_bb[PAWN]))

@@ -1820,14 +1820,14 @@ int main()
         {
             if (hash_table)
                 std::fill_n(hash_table, hash_size, HashEntry{});
-        }
-        else if (token == "position")
-        {
             for (Color c : {WHITE, BLACK})
                 std::fill_n(history[c], FROM_TO_SIZE, MoveHistory{});
             for (int c = PAWN; c < KING; c++)
                 for (int m = PAWN; m <= KING; m++)
                     std::fill_n(capture_history[6 * c + m], 64, MoveHistory{static_cast<std::int16_t>(384 - m)});
+        }
+        else if (token == "position")
+        {
             parser >> token;
             if (token == "startpos")
             {

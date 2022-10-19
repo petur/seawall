@@ -250,7 +250,7 @@ inline Square first_square(BitBoard b)
 inline Square pop(BitBoard& b)
 {
     Square ret = first_square(b);
-    b &= ~ret;
+    b &= static_cast<BitBoard>(b - 1);
     return ret;
 }
 

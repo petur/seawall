@@ -9,19 +9,28 @@ jobs:
         platform:
         - runner: ubuntu-latest
           shell: 'bash'
+          suffix: -linux-gcc-nehalem
+          cxx: g++
+          llvm_profdata: ''
+          arch: nehalem
+        - runner: ubuntu-latest
+          shell: 'bash'
           suffix: -linux-gcc
           cxx: g++
           llvm_profdata: ''
+          arch: haswell
         - runner: ubuntu-22.04
           shell: 'bash'
           suffix: -linux-clang
           cxx: clang++-14
           llvm_profdata: llvm-profdata-14
+          arch: haswell
         - runner: windows-latest
           shell: 'msys2 {0}'
           suffix: -windows-clang
           cxx: clang++
           llvm_profdata: llvm-profdata
+          arch: haswell
     defaults:
       run:
         shell: ${{ matrix.platform.shell }}
@@ -41,7 +50,7 @@ jobs:
     - id: make
       run: |
         make CXX=${{ matrix.platform.cxx }} LLVM_PROFDATA=${{ matrix.platform.llvm_profdata }} \
-          ARCH=haswell LDFLAGS='-static -s' SUFFIX=${{ matrix.platform.suffix }}
+          ARCH=${{ matrix.platform.arch }} LDFLAGS='-static -s' SUFFIX=${{ matrix.platform.suffix }}
         echo "::set-output name=artifact::$(basename -s .exe out/seawall-*)"
     - uses: actions/upload-artifact@v3
       with:

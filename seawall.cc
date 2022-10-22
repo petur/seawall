@@ -937,7 +937,7 @@ struct MoveGen
     const Stack& stack;
 
     explicit MoveGen(MoveGenType w, BitBoard ch, Move best, const Stack& st)
-        : wanted{w}, generated{}, moves{}, count{}, index{}, checkers{ch}, best_move{best}, stack{st} {}
+        : wanted{w}, generated{best ? START : BEST}, moves{}, count{}, index{}, checkers{ch}, best_move{best}, stack{st} {}
 
     Move next();
 
@@ -950,12 +950,12 @@ struct MoveGen
     void generate_targets(Square sq, BitBoard targets, MoveType mt);
     void generate_pawn_targets(Square sq, BitBoard targets, MoveType mt);
     void generate_target(Square sq, Square target, MoveType mt);
-    template<int Offset> void generate_castling(Square sq);
+    template<Color color> void generate_castling_moves(Square sq);
+    template<Color color, int Offset> void generate_castling_move(Square sq);
 };
 
 void MoveGen::generate_target(Square sq, Square target, MoveType mt)
 {
-    assert(!(target & ~63));
     Move mv = move(sq, target, mt);
     if (generated == BEST || mv != best_move)
         moves[count++] = {mv, (mt & CAPTURE) ? rank_capture(mv) : rank_quiet(mv)};
@@ -986,21 +986,24 @@ void MoveGen::generate_targets(MoveGenType gen, Square sq, BitBoard targets)
         generate_targets(sq, targets & ~position.all_bb(), {});
 }
 
-template<int Offset> void MoveGen::generate_castling(Square sq)
+template<Color color, int Offset> void MoveGen::generate_castling_move(Square sq)
 {
-    int rank = sq >> 3;
-    Square rook_from = square(Offset < 0 ? 0 : 7, rank);
-    if (!(line_attack(position.all_bb(), line_masks[sq][2]) & rook_from))
+    BitBoard between = static_cast<BitBoard>((Offset < 0 ? 0xeULL : 0x60ULL) << (color == WHITE ? 0 : 56));
+    if (between & position.all_bb())
         return;
 
-    for (int i = 0; i <= 2; i++)
-    {
-        Square s = square(4 + i * Offset, rank);
-        if (attackers(s, ~position.next))
-            return;
-    }
+    if (attackers(static_cast<Square>(sq + Offset), ~position.next))
+        return;
 
-    generate_target(sq, square(4 + 2 * Offset, rank), CASTLING);
+    generate_target(sq, static_cast<Square>(sq + 2 * Offset), CASTLING);
+}
+
+template<Color color> void MoveGen::generate_castling_moves(Square sq)
+{
+    if (position.castling & (WQ << (2 * color)))
+        generate_castling_move<color, -1>(sq);
+    if (position.castling & (WK << (2 * color)))
+        generate_castling_move<color, 1>(sq);
 }
 
 template<PieceType Type> void MoveGen::generate_piece(MoveGenType gen, Square sq, BitBoard to_mask)
@@ -1034,18 +1037,20 @@ template<PieceType Type> void MoveGen::generate_piece(MoveGenType gen, Square sq
     else if (Type == KING)
     {
         generate_targets(gen, sq, king_attack[sq] & to_mask);
-        if (gen == QUIETS && (to_mask & ~king_attack[sq]))
+        if (gen == QUIETS && !checkers && (to_mask & ~king_attack[sq]))
         {
-            if (position.castling & (WQ << (2 * position.next)))
-                generate_castling<-1>(sq);
-            if (position.castling & (WK << (2 * position.next)))
-                generate_castling<1>(sq);
+            if (position.next == WHITE)
+                generate_castling_moves<WHITE>(sq);
+            else
+                generate_castling_moves<BLACK>(sq);
         }
     }
 }
 
 template<PieceType Type> void MoveGen::generate_pieces(MoveGenType gen, BitBoard from_mask, BitBoard to_mask)
 {
+    if (!to_mask)
+        return;
     BitBoard pieces = position.color_bb[position.next] & position.type_bb[Type] & from_mask;
     while (pieces)
         generate_piece<Type>(gen, pop(pieces), to_mask);
@@ -1073,8 +1078,6 @@ void MoveGen::generate()
     BitBoard to_mask = ALL;
     if (generated == BEST)
     {
-        if (!best_move)
-            return;
         gen = type(best_move) & CAPTURE ? CAPTURES : QUIETS;
         if (gen > wanted)
             return;
@@ -1091,7 +1094,9 @@ void MoveGen::generate()
         else
         {
             Square king_sq = first_square(position.type_bb[KING] & position.color_bb[position.next]);
-            if (checkers & position.type_bb[BISHOP])
+            if (checkers & king_attack[king_sq])
+                to_mask = EMPTY;
+            else if (checkers & position.type_bb[BISHOP])
                 to_mask &= bishop_attack(king_sq, position.all_bb());
             else if (checkers & position.type_bb[ROOK])
                 to_mask &= rook_attack(king_sq, position.all_bb());

@@ -11,6 +11,10 @@
 #include <string_view>
 #include <vector>
 
+#ifdef __BMI2__
+#include <x86intrin.h>
+#endif
+
 #define STRINGIFY0(x) #x
 #define STRINGIFY(x) STRINGIFY0(x)
 
@@ -228,7 +232,10 @@ std::ostream& operator<<(std::ostream& out, Square sq)
     return out;
 }
 
-enum BitBoard : std::uint64_t { EMPTY = 0, ALL = ~0ULL };
+enum BitBoard : std::uint64_t
+{
+    EMPTY = 0, FILE_A = 0x0101010101010101ULL, FILE_H = FILE_A << 7, RANK_1 = 0x00000000000000ffULL, RANK_8 = RANK_1 << 56, ALL = ~0ULL
+};
 
 inline BitBoard bb(Square s) { return static_cast<BitBoard>(1ULL << s); }
 inline BitBoard& operator|=(BitBoard& lhs, Square rhs) { return lhs = static_cast<BitBoard>(lhs | bb(rhs)); }
@@ -388,6 +395,58 @@ struct LineMask
 
 alignas(64) static LineMask line_masks[64][4];
 
+BitBoard line_attack(BitBoard blockers, const LineMask& lm)
+{
+    BitBoard lower = lm.lower & blockers;
+    BitBoard upper = lm.upper & blockers;
+    return static_cast<BitBoard>(lm.full & (upper ^ (upper - (0x8000000000000000ULL >> __builtin_clzll(lower | 1)))));
+}
+
+BitBoard bishop_attack_comp(Square sq, BitBoard blockers)
+{
+    return line_attack(blockers, line_masks[sq][0])
+        | line_attack(blockers, line_masks[sq][1]);
+}
+
+BitBoard rook_attack_comp(Square sq, BitBoard blockers)
+{
+    return line_attack(blockers, line_masks[sq][2])
+        | line_attack(blockers, line_masks[sq][3]);
+}
+
+#ifdef __BMI2__
+alignas(64) static BitBoard bishop_pext_masks[64];
+alignas(64) static BitBoard bishop_pext_table[64][1 << 9];
+
+alignas(64) static BitBoard rook_pext_masks[64];
+alignas(64) static BitBoard rook_pext_table[64][1 << 12];
+
+BitBoard bishop_attack(Square sq, BitBoard blockers)
+{
+    return bishop_pext_table[sq][_pext_u64(blockers, bishop_pext_masks[sq])];
+}
+
+BitBoard rook_attack(Square sq, BitBoard blockers)
+{
+    return rook_pext_table[sq][_pext_u64(blockers, rook_pext_masks[sq])];
+}
+#else
+inline BitBoard bishop_attack(Square sq, BitBoard blockers)
+{
+    return bishop_attack_comp(sq, blockers);
+}
+
+inline BitBoard rook_attack(Square sq, BitBoard blockers)
+{
+    return rook_attack_comp(sq, blockers);
+}
+#endif
+
+BitBoard queen_attack(Square sq, BitBoard blockers)
+{
+    return bishop_attack(sq, blockers) | rook_attack(sq, blockers);
+}
+
 BitBoard offset_bitboard(int file, int rank, const std::pair<int, int> (&offsets)[8])
 {
     BitBoard ret{};
@@ -445,31 +504,26 @@ void init_bitboards()
         line_masks[sq][1] = {ray[sq][6], ray[sq][2]};
         line_masks[sq][2] = {ray[sq][1], ray[sq][5]};
         line_masks[sq][3] = {ray[sq][7], ray[sq][3]};
+
+#ifdef __BMI2__
+        bishop_pext_masks[sq] = ray[sq][0] | ray[sq][2] | ray[sq][4] | ray[sq][6];
+        bishop_pext_masks[sq] &= ~(FILE_A | FILE_H | RANK_1 | RANK_8);
+        for (int i = 0; i < 1 << popcount(bishop_pext_masks[sq]); i++)
+            bishop_pext_table[sq][i] = bishop_attack_comp(sq, static_cast<BitBoard>(_pdep_u64(i, bishop_pext_masks[sq])));
+
+        rook_pext_masks[sq] = ray[sq][1] | ray[sq][3] | ray[sq][5] | ray[sq][7];
+        if (!(bb(sq) & FILE_A))
+            rook_pext_masks[sq] &= ~FILE_A;
+        if (!(bb(sq) & FILE_H))
+            rook_pext_masks[sq] &= ~FILE_H;
+        if (!(bb(sq) & RANK_1))
+            rook_pext_masks[sq] &= ~RANK_1;
+        if (!(bb(sq) & RANK_8))
+            rook_pext_masks[sq] &= ~RANK_8;
+        for (int i = 0; i < 1 << popcount(rook_pext_masks[sq]); i++)
+            rook_pext_table[sq][i] = rook_attack_comp(sq, static_cast<BitBoard>(_pdep_u64(i, rook_pext_masks[sq])));
+#endif
     }
-}
-
-BitBoard line_attack(BitBoard blockers, const LineMask& lm)
-{
-    BitBoard lower = lm.lower & blockers;
-    BitBoard upper = lm.upper & blockers;
-    return static_cast<BitBoard>(lm.full & (upper ^ (upper - (0x8000000000000000ULL >> __builtin_clzll(lower | 1)))));
-}
-
-BitBoard bishop_attack(Square sq, BitBoard blockers)
-{
-    return line_attack(blockers, line_masks[sq][0])
-        | line_attack(blockers, line_masks[sq][1]);
-}
-
-BitBoard rook_attack(Square sq, BitBoard blockers)
-{
-    return line_attack(blockers, line_masks[sq][2])
-        | line_attack(blockers, line_masks[sq][3]);
-}
-
-BitBoard queen_attack(Square sq, BitBoard blockers)
-{
-    return bishop_attack(sq, blockers) | rook_attack(sq, blockers);
 }
 
 struct Memo

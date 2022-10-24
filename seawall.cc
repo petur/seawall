@@ -273,7 +273,7 @@ inline MoveType operator~(MoveType m) { return static_cast<MoveType>(~static_cas
 inline PieceType promotion(MoveType m) { return static_cast<PieceType>(1 + (m & 3)); }
 inline MoveType promotion_move(PieceType t) { return static_cast<MoveType>((t - 1) | PROMOTION); }
 
-enum Move : std::uint16_t { NULL_MOVE = 0, FROM_TO_MASK = 0xfff, FROM_TO_SIZE = 0x1000, INVALID = 0xffff };
+enum Move : std::uint16_t { NULL_MOVE = 0, NO_MOVE = 0xfff, FROM_TO_MASK = 0xfff, FROM_TO_SIZE = 0x1000, INVALID = 0xffff };
 
 inline Move move(Square from, Square to, MoveType type) { return static_cast<Move>(from | to << 6 | type << 12); }
 inline Square from(Move mv) { return static_cast<Square>(mv & 63); }
@@ -282,16 +282,21 @@ inline MoveType type(Move mv) { return static_cast<MoveType>((mv >> 12) & 15); }
 
 std::ostream& operator<<(std::ostream& out, Move mv)
 {
-    out << from(mv) << to(mv);
-    if (type(mv) & PROMOTION)
+    if (mv == NO_MOVE)
+        out << "(none)";
+    else
     {
-        switch (promotion(type(mv)))
+        out << from(mv) << to(mv);
+        if (type(mv) & PROMOTION)
         {
-            case QUEEN: out << 'q'; break;
-            case ROOK: out << 'r'; break;
-            case BISHOP: out << 'b'; break;
-            case KNIGHT: out << 'n'; break;
-            default: break;
+            switch (promotion(type(mv)))
+            {
+                case QUEEN: out << 'q'; break;
+                case ROOK: out << 'r'; break;
+                case BISHOP: out << 'b'; break;
+                case KNIGHT: out << 'n'; break;
+                default: break;
+            }
         }
     }
     return out;
@@ -1568,7 +1573,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     }
 
     if (move_count == 0)
-        return {checkers ? -SCORE_MATE + ply : 0, NULL_MOVE};
+        return {checkers ? -SCORE_MATE + ply : 0, NO_MOVE};
     if (ply > 0 && position.halfmove_clock >= 100)
         return {0, NULL_MOVE};
 

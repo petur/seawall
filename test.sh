@@ -50,5 +50,7 @@ echo 'position fen Q5k1/1K6/1Q6/3p4/2q5/8/4q3/8 b - - 0 71'
 echo 'go wtime 1 winc 0 btime 0 binc 0 movestogo 931'
 echo 'position fen 8/8/8/8/8/7k/q7/6RK w - - 0 1'
 echo 'go depth 2'
+echo 'position fen 6Q1/8/8/8/8/7K/8/7k b - - 0 1'
+echo 'go depth 1'
 echo 'quit'
 ) | ./seawall

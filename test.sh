@@ -52,5 +52,7 @@ echo 'position fen 8/8/8/8/8/7k/q7/6RK w - - 0 1'
 echo 'go depth 2'
 echo 'position fen 6Q1/8/8/8/8/7K/8/7k b - - 0 1'
 echo 'go depth 1'
+echo 'position fen 7Q/8/8/8/8/8/8/5K1k b - - 0 1'
+echo 'go depth 1'
 echo 'quit'
 ) | ./seawall

@@ -1646,7 +1646,7 @@ void Search::iterate(int max_depth)
 
         if (v.second)
         {
-            assert(v.first > -SCORE_MATE);
+            assert(v.first > -SCORE_MATE || v.second == NO_MOVE);
             assert(v.first < SCORE_MATE);
 
             if (v.second != best_move)

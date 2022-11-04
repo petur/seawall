@@ -305,7 +305,7 @@ std::ostream& operator<<(std::ostream& out, Move mv)
 #ifndef TUNE
 constexpr
 #endif
-int material[6] = {100, 348, 382, 579, 1144, 100000};
+int material[6] = {100, 346, 382, 583, 1151, 100000};
 
 alignas(64)
 #ifndef TUNE
@@ -315,63 +315,63 @@ int piece_square_table[6][64] =
 {
     {
         0, 0, 0, 0, 0, 0, 0, 0,
-        20, 35, 15, -9, -7, 27, 35, 6,
-        29, 36, 18, 17, 21, 29, 39, 17,
-        29, 36, 27, 33, 31, 23, 27, 10,
-        50, 41, 26, 46, 41, 26, 38, 34,
-        122, 121, 95, 110, 101, 71, 118, 87,
-        227, 219, 177, 197, 152, 161, 206, 169,
+        18, 37, 14, -10, -9, 27, 36, 7,
+        31, 37, 19, 17, 16, 27, 42, 14,
+        25, 35, 27, 34, 28, 22, 30, 13,
+        46, 40, 28, 44, 37, 26, 40, 34,
+        119, 110, 97, 110, 89, 68, 130, 92,
+        216, 211, 169, 180, 140, 161, 194, 162,
         0, 0, 0, 0, 0, 0, 0, 0,
     },
     {
-        -92, -22, -20, -18, -36, -4, -17, -58,
-        -31, -37, -7, 7, 10, 10, -14, 10,
-        -16, 0, 14, 33, 33, 27, 9, -25,
-        1, 15, 42, 28, 46, 35, 20, 2,
-        -5, 22, 56, 63, 44, 60, 41, 43,
-        -11, 43, 54, 78, 61, 47, 33, -24,
-        -10, 7, 56, 37, 5, 43, -7, -25,
-        -83, -113, 7, 2, 31, 8, 5, -126,
+        -85, -24, -21, -12, -30, -10, -19, -55,
+        -27, -24, -25, 6, 10, 8, -12, -20,
+        -20, 0, 14, 32, 24, 25, 8, -24,
+        4, 20, 41, 34, 48, 37, 15, 6,
+        4, 22, 58, 67, 43, 53, 43, 40,
+        -15, 34, 53, 76, 58, 55, 42, -3,
+        -8, 10, 49, 50, 18, 48, -10, -24,
+        -132, -30, 29, -10, 24, -16, 20, -150,
     },
     {
-        -62, -23, -30, -23, -16, -13, -49, -55,
-        -7, -2, -25, -9, 16, 12, 16, -14,
-        -5, 15, 3, 20, 9, 35, 20, 17,
-        -5, 11, 32, 28, 32, 12, 10, 8,
-        -1, 23, 26, 42, 40, 37, 10, 12,
-        -1, 17, 29, 31, 19, 29, 28, -6,
-        -74, 35, 4, 8, -1, 13, 4, -32,
-        17, -28, 22, -15, -3, 8, -16, -44,
+        -41, -28, -33, -29, -32, -13, -51, -45,
+        -35, -2, -8, -8, 16, 19, 12, -24,
+        -2, 15, 4, 21, 8, 34, 17, 12,
+        0, 7, 35, 30, 32, 11, 13, 2,
+        3, 17, 34, 34, 36, 39, 8, 13,
+        11, 22, 37, 20, 27, 25, 26, -10,
+        -70, 24, 11, 27, -2, 7, 13, -7,
+        1, 5, 13, 1, -3, 9, -13, -24,
     },
     {
-        -23, -9, -2, 7, 8, -18, -39, -49,
-        -31, -26, -2, 1, -15, -8, -18, -60,
-        -5, -4, -3, -15, -12, -18, -30, -29,
-        -4, 4, 11, 15, 3, -9, 7, -8,
-        26, 29, 33, 42, 33, 38, 19, 22,
-        49, 58, 46, 54, 54, 47, 48, 31,
-        57, 53, 50, 56, 50, 44, 46, 33,
-        39, 46, 31, 35, 38, 20, 36, 21,
+        -23, -11, -2, 5, 7, -18, -37, -48,
+        -33, -23, -1, -3, -8, -13, -10, -51,
+        -8, -11, -3, -21, -7, -17, -20, -32,
+        -1, 1, 25, 11, 5, -2, -5, -7,
+        21, 25, 37, 39, 31, 41, 21, 27,
+        46, 56, 49, 51, 54, 45, 47, 36,
+        60, 57, 59, 58, 58, 51, 39, 31,
+        42, 38, 36, 45, 34, 31, 27, 27,
     },
     {
-        -42, -48, -37, -16, -31, -49, -85, -71,
-        -57, -10, -7, -1, -12, -15, -45, -18,
-        -1, -7, -8, -6, 0, -5, 11, -32,
-        -13, -1, 1, -19, -3, 14, 3, -13,
-        1, 0, 36, 18, 44, 31, 15, -1,
-        -32, 11, 43, 28, 39, 62, 54, 27,
-        -13, 6, 47, 62, 53, 84, 36, -6,
-        -3, 15, 11, 36, 55, 50, 20, 30,
+        -41, -49, -35, -16, -40, -35, -40, -61,
+        -52, -22, -8, -3, -13, -11, -55, -30,
+        9, -7, -7, -4, 3, -5, 10, -46,
+        -14, -18, 3, -6, 2, 13, -2, -22,
+        4, -7, 42, 17, 40, 29, 19, -1,
+        -35, -2, 41, 52, 50, 63, 51, 36,
+        -10, 0, 40, 39, 47, 66, 40, -4,
+        -3, 0, 24, 40, 51, 66, 3, 3,
     },
     {
-        -13, 2, 21, -37, -14, -11, 32, -10,
-        -3, 19, 12, -14, -13, 14, 12, 2,
-        14, 11, 7, 16, 11, 12, 22, -2,
-        25, 31, 38, 38, 32, 44, 47, 25,
-        16, 47, 42, 66, 60, 60, 60, 49,
-        31, 43, 53, 52, 66, 71, 65, 57,
-        18, -11, 27, 43, 60, 48, 62, 62,
-        -84, -74, -4, 1, 6, 18, 23, -43,
+        -15, 6, 19, -37, -16, -17, 32, -10,
+        5, 22, 8, -8, -15, 14, 11, 1,
+        -1, 13, 10, 12, 15, 17, 21, -2,
+        20, 44, 39, 44, 34, 43, 37, 15,
+        36, 55, 39, 60, 59, 66, 59, 48,
+        44, 58, 63, 53, 70, 53, 67, 67,
+        28, -11, 25, 46, 57, 60, 59, 60,
+        -99, -82, 9, 5, 20, 20, 48, -26,
     },
 };
 
@@ -1129,7 +1129,7 @@ Move MoveGen::next()
 
 int evaluate()
 {
-    return 11 + position.piece_square_values[position.next] - position.piece_square_values[~position.next];
+    return 13 + position.piece_square_values[position.next] - position.piece_square_values[~position.next];
 }
 
 constexpr int SCORE_MATE = 32767;
@@ -1329,7 +1329,7 @@ bool Search::check_time(int changes, int improving)
     if (total_time != static_cast<std::clock_t>(-1) && !stopped)
     {
         int pieces = popcount(position.color_bb[WHITE] | position.color_bb[BLACK]);
-        max_time = std::min(total_time, 24 * total_time / ((4 + ((changes <= 1) * std::max(0, improving - 1))) * (16 + pieces)) + 4 * increment);
+        max_time = std::min(total_time, 23 * total_time / ((4 + ((changes <= 1) * std::max(0, improving - 1))) * (16 + pieces)) + 4 * increment);
         std::clock_t target_time = std::min(
             max_time,
             36 * total_time / ((4 + ((changes <= 1) * std::max(0, improving - 1))) * std::min(20 * std::max(16, pieces), 11 * moves_to_go))
@@ -1376,12 +1376,12 @@ int Search::qsearch(int ply, int depth, int alpha, int beta)
         if (is_stopped())
             return alpha;
 
-        if (!checkers && !(type(mv) & PROMOTION) && pat + material[type(position.squares[to(mv)])] < alpha - 54)
+        if (!checkers && !(type(mv) & PROMOTION) && pat + material[type(position.squares[to(mv)])] < alpha - 53)
             continue;
 
         if (!checkers && !(type(mv) & PROMOTION) && mv != best && depth < -1 &&
                 (pawn_attack[position.next][to(mv)] & position.type_bb[PAWN] & position.color_bb[~position.next]) &&
-                material[type(position.squares[from(mv)])] > material[type(position.squares[to(mv)])] + 150)
+                material[type(position.squares[from(mv)])] > material[type(position.squares[to(mv)])] + 151)
             continue;
 
         ++nodes;
@@ -1450,7 +1450,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     if (he && ((hv > eval && (he->flags & LOWER)) || (hv < eval && (he->flags & UPPER))))
         eval = hv;
 
-    if (!pv && !checkers && depth <= 3 && eval > beta + 217 * depth - 142)
+    if (!pv && !checkers && depth <= 3 && eval > beta + 213 * depth - 143)
         return {beta, NULL_MOVE};
 
     if (ply >= sel_depth)
@@ -1469,7 +1469,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     {
         Memo memo = do_move(ply, NULL_MOVE);
 
-        int v = -search(false, ply + 1, depth - 2 - (eval - beta) / 198, -beta, -beta + 1).first;
+        int v = -search(false, ply + 1, depth - 2 - (eval - beta) / 197, -beta, -beta + 1).first;
         undo_move(NULL_MOVE, memo);
         if (v >= beta)
         {
@@ -1488,9 +1488,9 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
 
     while (Move mv = gen.next())
     {
-        if (!checkers && move_count && depth <= 5 && eval < alpha - (depth * 222 - 141) && !(type(mv) & (CAPTURE | PROMOTION)))
+        if (!checkers && move_count && depth <= 5 && eval < alpha - (depth * 223 - 141) && !(type(mv) & (CAPTURE | PROMOTION)))
             continue;
-        if (!checkers && depth <= 5 && alpha > -SCORE_WIN && eval < alpha - 33 - 25 * depth &&
+        if (!checkers && depth <= 5 && alpha > -SCORE_WIN && eval < alpha - 32 - 23 * depth &&
                 !(type(mv) & (CAPTURE | PROMOTION)) && mv != prev_best && mv != stack[ply].killer_moves[0] && mv != stack[ply].killer_moves[1])
         {
             ++mcp;
@@ -1502,7 +1502,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         if (checkers)
             extension++;
         else if (depth <= 2 && ply < 2 * root_depth && (type(mv) & CAPTURE) && (type(stack[ply].prev_move) & CAPTURE) &&
-                to(mv) == to(stack[ply].prev_move) && eval + material[type(position.squares[to(mv)])] > alpha - 25 && eval < beta + 25)
+                to(mv) == to(stack[ply].prev_move) && eval + material[type(position.squares[to(mv)])] > alpha - 27 && eval < beta + 26)
             extension++;
         else if (!(type(mv) & CAPTURE) && type(position.squares[from(mv)]) == PAWN && ply < 2 * root_depth &&
                 (bb(to(mv)) & (position.next == WHITE ? 0x00ffffff00000000ULL : 0x00000000ffffff00ULL)) &&
@@ -1691,7 +1691,7 @@ double evaluation_error()
                 position.set(sq, pos.first.squares[sq]);
         }
 
-        error += std::pow(pos.second * 0.5 - 1. / (1. + std::pow(0.99514, evaluate())), 2);
+        error += std::pow(pos.second * 0.5 - 1. / (1. + std::pow(0.99513, evaluate())), 2);
     }
     return error / tuning_positions.size();
 }

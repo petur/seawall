@@ -263,6 +263,15 @@ inline Square pop(BitBoard& b)
 
 inline int popcount(BitBoard b) { return __builtin_popcountll(b); }
 
+template<int Offset>
+inline BitBoard shift_signed(BitBoard b)
+{
+    if constexpr (Offset >= 0)
+        return b << Offset;
+    else
+        return b >> -Offset;
+}
+
 enum MoveType : std::uint8_t { EN_PASSANT = 1, CASTLING = 2, PROMOTION = 4, CAPTURE = 8, INVALID_TYPE = 15 };
 
 inline MoveType& operator|=(MoveType& lhs, MoveType rhs) { return lhs = static_cast<MoveType>(lhs | rhs); }
@@ -1127,9 +1136,21 @@ Move MoveGen::next()
     return moves[index++].move;
 }
 
+template<Color C>
+int evaluate_player()
+{
+    constexpr int FWD = C == WHITE ? 8 : -8;
+    BitBoard pawns = position.type_bb[PAWN] & position.color_bb[C];
+    BitBoard attack = shift_signed<FWD - 1>(pawns & ~FILE_A) | shift_signed<FWD + 1>(pawns & ~FILE_H);
+    constexpr BitBoard CP_RANKS = static_cast<BitBoard>(C == WHITE ? 0x000000ffffff0000ULL : 0x0000ffffff000000ULL);
+
+    return position.piece_square_values[C] + 5 * popcount(pawns & CP_RANKS & attack);
+}
+
 int evaluate()
 {
-    return 13 + position.piece_square_values[position.next] - position.piece_square_values[~position.next];
+    int eval = evaluate_player<WHITE>() - evaluate_player<BLACK>();
+    return 13 + (position.next == WHITE ? eval : -eval);
 }
 
 constexpr int SCORE_MATE = 32767;

@@ -311,80 +311,128 @@ std::ostream& operator<<(std::ostream& out, Move mv)
     return out;
 }
 
+struct alignas(4) Score
+{
+    std::int16_t mid;
+    std::int16_t end;
+
+    constexpr Score() : mid{}, end{} { }
+    constexpr Score(std::int16_t m, std::int16_t e) : mid{m}, end{e} { }
+};
+
+inline Score operator-(Score s)
+{
+    return {static_cast<std::int16_t>(-s.mid), static_cast<std::int16_t>(-s.end)};
+}
+
+inline Score& operator+=(Score& lhs, Score rhs)
+{
+    lhs.mid += rhs.mid;
+    lhs.end += rhs.end;
+    return lhs;
+}
+
+inline Score operator+(Score lhs, Score rhs)
+{
+    return lhs += rhs;
+}
+
+inline Score& operator-=(Score& lhs, Score rhs)
+{
+    lhs.mid -= rhs.mid;
+    lhs.end -= rhs.end;
+    return lhs;
+}
+
+inline Score operator-(Score lhs, Score rhs)
+{
+    return lhs -= rhs;
+}
+
+inline Score operator*(Score lhs, int rhs)
+{
+    return {static_cast<std::int16_t>(lhs.mid * rhs), static_cast<std::int16_t>(lhs.end * rhs)};
+}
+
+std::ostream& operator<<(std::ostream& out, Score s)
+{
+    return out << '{' << s.mid << ", " << s.end << '}';
+}
+
 #ifndef TUNE
 constexpr
 #endif
-int material[6] = {100, 351, 387, 585, 1164, 100000};
+Score material[6] = {{100, 116}, {400, 296}, {434, 339}, {598, 562}, {1261, 1038}, {2000, 2000}};
 
 alignas(64)
 #ifndef TUNE
 constexpr
 #endif
-int piece_square_table[6][64] =
+Score piece_square_table[6][64] =
 {
     {
-        0, 0, 0, 0, 0, 0, 0, 0,
-        16, 35, 14, -8, -7, 30, 36, 9,
-        23, 30, 12, 11, 9, 23, 29, 6,
-        23, 31, 26, 32, 27, 22, 23, 11,
-        48, 42, 28, 40, 36, 31, 39, 35,
-        121, 115, 102, 109, 92, 82, 117, 95,
-        206, 229, 164, 175, 170, 154, 203, 164,
-        0, 0, 0, 0, 0, 0, 0, 0,
+        {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0},
+        {-28, 56}, {17, 42}, {3, 40}, {-13, -9}, {-19, -6}, {17, 33}, {35, 29}, {-16, 23},
+        {-10, 33}, {21, 27}, {6, 8}, {0, 24}, {-6, 30}, {17, 17}, {31, 15}, {-9, 6},
+        {-16, 41}, {7, 39}, {26, 24}, {33, 1}, {27, 4}, {8, 19}, {15, 31}, {-11, 13},
+        {-9, 89}, {3, 66}, {10, 54}, {37, 35}, {47, 4}, {-5, 44}, {13, 63}, {13, 46},
+        {61, 139}, {66, 126}, {66, 129}, {116, 96}, {69, 111}, {61, 96}, {101, 90}, {70, 93},
+        {213, 192}, {208, 176}, {160, 157}, {180, 169}, {157, 144}, {143, 145}, {181, 196}, {166, 150},
+        {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0},
     },
     {
-        -83, -23, -25, -10, -28, -14, -21, -73,
-        -33, -37, -5, 7, 10, 5, -13, -19,
-        -19, 1, 16, 27, 24, 27, 8, -23,
-        4, 20, 39, 36, 52, 38, 26, 8,
-        3, 27, 55, 66, 45, 46, 43, 42,
-        -4, 39, 55, 84, 63, 62, 28, -7,
-        -11, 20, 61, 58, 16, 47, -26, -14,
-        -104, -6, 20, 13, 34, -6, -5, -93,
+        {-73, -109}, {-15, -48}, {-12, -30}, {11, -12}, {-41, -45}, {2, -21}, {-23, -20}, {-56, -101},
+        {-40, -32}, {0, -32}, {8, -34}, {10, 6}, {8, 12}, {16, 5}, {10, -4}, {-20, -64},
+        {-24, -33}, {11, 43}, {16, 25}, {31, 27}, {31, 19}, {26, 30}, {10, 8}, {-27, -19},
+        {-1, -7}, {-19, 26}, {53, 39}, {32, 48}, {47, 51}, {46, 20}, {22, 15}, {22, 4},
+        {32, 10}, {22, 39}, {57, 78}, {73, 39}, {50, 54}, {65, 36}, {35, 39}, {38, 29},
+        {-12, -13}, {37, 11}, {61, 49}, {112, 52}, {127, 30}, {98, 27}, {58, 26}, {-18, 6},
+        {-14, -16}, {19, 12}, {56, 28}, {68, 48}, {12, 17}, {63, 36}, {-16, 9}, {-7, 15},
+        {-113, -103}, {0, 4}, {26, 30}, {10, 16}, {29, 27}, {4, 4}, {-4, -13}, {-84, -103},
     },
     {
-        -59, -19, -33, -22, -29, -17, -37, -45,
-        -12, -3, -3, -10, 18, 14, 18, -9,
-        -13, 11, 9, 20, 11, 36, 14, 13,
-        6, 10, 30, 30, 37, 14, 10, 0,
-        0, 18, 42, 48, 33, 39, 11, 14,
-        8, 20, 38, 28, 34, 37, 35, 3,
-        -80, 34, 0, 27, 7, 5, 11, -14,
-        17, 9, 10, 19, -9, 6, -8, -19,
+        {-61, -69}, {-8, -31}, {-26, -72}, {-21, -15}, {-1, -28}, {-9, -59}, {-34, -43}, {-36, -46},
+        {12, -25}, {-1, -11}, {-3, -3}, {-12, -8}, {17, 12}, {43, -23}, {22, 3}, {17, -14},
+        {-21, 9}, {8, 13}, {-10, 27}, {9, 34}, {13, 24}, {38, 33}, {18, 14}, {13, 8},
+        {-12, 6}, {28, 8}, {31, 42}, {47, 18}, {29, 39}, {14, 15}, {16, 14}, {25, -4},
+        {-16, 2}, {15, 23}, {35, 37}, {89, 23}, {64, 10}, {66, 16}, {-1, 52}, {19, 2},
+        {-2, -2}, {30, 0}, {48, 33}, {46, -6}, {62, 32}, {60, 34}, {38, 12}, {31, -13},
+        {-99, -38}, {54, 18}, {19, 5}, {22, 13}, {2, 1}, {34, 8}, {15, 19}, {-33, -1},
+        {3, 11}, {1, 21}, {-11, 10}, {2, -24}, {-26, -31}, {-4, -2}, {-6, 4}, {-7, -7},
     },
     {
-        -24, -10, -3, 4, 6, -17, -38, -45,
-        -35, -23, 1, -4, -9, -14, -15, -57,
-        -5, -9, 4, -15, -14, -14, -25, -26,
-        0, 4, 22, 23, 3, -4, 1, -5,
-        24, 24, 34, 41, 30, 42, 20, 27,
-        48, 54, 51, 57, 58, 48, 47, 37,
-        63, 55, 61, 59, 57, 52, 42, 34,
-        36, 44, 37, 39, 42, 28, 39, 28,
+        {-26, -32}, {-16, -9}, {-2, 4}, {6, 5}, {6, 4}, {-22, -14}, {-38, -6}, {-40, -47},
+        {-40, -9}, {-33, -9}, {8, -20}, {-2, -16}, {-2, -9}, {-21, 13}, {-13, -14}, {-63, -40},
+        {-7, -11}, {-16, -8}, {-26, 4}, {-33, 10}, {-3, -11}, {-32, 3}, {-22, -15}, {-42, -13},
+        {-27, 15}, {-56, 36}, {33, 26}, {23, 11}, {16, -6}, {-44, 37}, {-44, 13}, {-11, -9},
+        {-40, 65}, {8, 35}, {8, 34}, {41, 41}, {39, 20}, {48, 15}, {0, 37}, {7, 25},
+        {60, 27}, {63, 41}, {84, 24}, {63, 32}, {102, 25}, {73, 21}, {42, 27}, {45, 26},
+        {100, 28}, {84, 21}, {152, -11}, {108, 19}, {104, 27}, {66, 26}, {39, 35}, {38, 27},
+        {54, 16}, {41, 40}, {40, 15}, {54, 23}, {51, 36}, {48, 13}, {39, 16}, {28, 32},
     },
     {
-        -43, -34, -35, -14, -37, -37, -61, -73,
-        -63, -25, -6, -3, -11, -17, -43, -11,
-        2, -5, -7, -4, -3, -10, 2, -32,
-        -9, -16, 1, -8, 3, 15, 1, -26,
-        1, -2, 41, 25, 51, 43, 12, 4,
-        -31, 14, 40, 51, 59, 67, 47, 25,
-        -8, 0, 41, 35, 42, 67, 41, -9,
-        2, -13, 9, 24, 47, 60, 22, -3,
+        {-30, -43}, {-38, -40}, {-18, -69}, {-9, -68}, {-39, -51}, {-18, -60}, {-41, -52}, {-76, -80},
+        {-68, -68}, {-41, -30}, {3, -45}, {-1, -18}, {-10, -20}, {-13, -24}, {-40, -57}, {-10, -17},
+        {-3, -2}, {-5, -5}, {1, -51}, {-12, -4}, {-5, -6}, {0, -8}, {5, 5}, {-20, -29},
+        {-18, -27}, {-18, -23}, {-19, 2}, {-22, 33}, {0, 9}, {-4, 32}, {9, 6}, {-17, -29},
+        {-2, -19}, {-7, 2}, {34, 35}, {17, 44}, {48, 60}, {37, 45}, {-10, 47}, {-4, 4},
+        {-36, -20}, {14, 5}, {15, 38}, {47, 46}, {65, 47}, {83, 58}, {53, 48}, {15, 52},
+        {-14, -3}, {-23, 8}, {49, 46}, {26, 27}, {34, 35}, {63, 56}, {5, 43}, {-18, 6},
+        {13, -7}, {1, -3}, {21, 20}, {32, 21}, {62, 54}, {66, 46}, {48, 28}, {20, 8},
     },
     {
-        -2, 12, 17, -39, -16, -15, 35, 1,
-        8, 21, 7, -12, -13, 15, 15, -3,
-        1, 19, 7, 15, 12, 16, 20, -4,
-        14, 36, 33, 38, 30, 40, 48, 8,
-        34, 55, 43, 56, 54, 62, 50, 54,
-        20, 57, 70, 57, 59, 59, 77, 55,
-        15, -10, 35, 45, 92, 63, 64, 48,
-        -61, -80, -21, -19, 31, 30, -2, -91,
+        {-12, 0}, {27, -25}, {18, 0}, {-37, -40}, {-2, -49}, {-16, -25}, {61, -33}, {-9, -13},
+        {-43, -9}, {18, 19}, {-6, 22}, {-67, 55}, {-65, 49}, {13, 5}, {-6, 16}, {-16, 15},
+        {7, 10}, {-4, 21}, {-29, 31}, {-52, 55}, {-50, 56}, {-46, 62}, {-31, 45}, {-89, 34},
+        {27, 30}, {40, 26}, {34, 34}, {49, 38}, {22, 58}, {18, 55}, {41, 43}, {-24, 22},
+        {27, 23}, {72, 49}, {45, 48}, {92, 52}, {82, 51}, {77, 60}, {82, 53}, {52, 53},
+        {28, 20}, {60, 62}, {78, 57}, {65, 55}, {70, 49}, {62, 68}, {86, 63}, {56, 60},
+        {27, 14}, {18, -51}, {57, 54}, {68, 65}, {103, 26}, {67, 55}, {64, 62}, {48, 45},
+        {-53, -66}, {-71, -68}, {-9, -11}, {-12, -23}, {26, 8}, {31, 26}, {7, 33}, {-87, -79},
     },
 };
 
-int piece_square_value(Square sq, Color c, PieceType t)
+Score piece_square_value(Square sq, Color c, PieceType t)
 {
     unsigned flip = c == WHITE ? 0 : 56;
     return material[t] + piece_square_table[t][sq ^ flip];
@@ -577,7 +625,7 @@ struct Position
     Square en_passant;
     int halfmove_clock;
     std::uint64_t piece_hash;
-    int piece_square_values[2];
+    Score piece_square_values[2];
 } position;
 
 void Position::clear(Square sq, Color c, PieceType t)
@@ -772,8 +820,8 @@ void Position::reset()
         b = EMPTY;
     for (Piece& p : squares)
         p = NONE;
-    for (int& v : piece_square_values)
-        v = 0;
+    for (Score& v : piece_square_values)
+        v = {};
 }
 
 Move Position::parse_move(std::string_view s) const
@@ -1139,10 +1187,10 @@ Move MoveGen::next()
 #ifndef TUNE
 constexpr
 #endif
-int pawn_evals[1] = {13};
+Score pawn_evals[1] = {{13, 9}};
 
 template<Color C>
-int evaluate_player()
+Score evaluate_player()
 {
     constexpr int FWD = C == WHITE ? 8 : -8;
     BitBoard pawns = position.type_bb[PAWN] & position.color_bb[C];
@@ -1154,8 +1202,10 @@ int evaluate_player()
 
 int evaluate()
 {
-    int eval = evaluate_player<WHITE>() - evaluate_player<BLACK>();
-    return 13 + (position.next == WHITE ? eval : -eval);
+    Score eval = evaluate_player<WHITE>() - evaluate_player<BLACK>();
+    Score result = Score{16, 8} + (position.next == WHITE ? eval : -eval);
+    int pieces = popcount(position.all_bb()) - 1;
+    return (pieces * result.mid + (32 - pieces) * result.end) / 32;
 }
 
 constexpr int SCORE_MATE = 32767;
@@ -1355,7 +1405,7 @@ bool Search::check_time(int changes, int improving)
     if (total_time != static_cast<std::clock_t>(-1) && !stopped)
     {
         int pieces = popcount(position.color_bb[WHITE] | position.color_bb[BLACK]);
-        max_time = std::min(total_time, 23 * total_time / ((4 + ((changes <= 1) * std::max(0, improving - 1))) * (17 + pieces)) + 4 * increment);
+        max_time = std::min(total_time, 22 * total_time / ((4 + ((changes <= 1) * std::max(0, improving - 1))) * (17 + pieces)) + 4 * increment);
         std::clock_t target_time = std::min(
             max_time,
             36 * total_time / ((4 + ((changes <= 1) * std::max(0, improving - 1))) * std::min(20 * std::max(16, pieces), 11 * moves_to_go))
@@ -1402,12 +1452,12 @@ int Search::qsearch(int ply, int depth, int alpha, int beta)
         if (is_stopped())
             return alpha;
 
-        if (!checkers && !(type(mv) & PROMOTION) && pat + material[type(position.squares[to(mv)])] < alpha - 53)
+        if (!checkers && !(type(mv) & PROMOTION) && pat + material[type(position.squares[to(mv)])].mid < alpha - 53)
             continue;
 
         if (!checkers && !(type(mv) & PROMOTION) && mv != best && depth < -1 &&
                 (pawn_attack[position.next][to(mv)] & position.type_bb[PAWN] & position.color_bb[~position.next]) &&
-                material[type(position.squares[from(mv)])] > material[type(position.squares[to(mv)])] + 151)
+                material[type(position.squares[from(mv)])].mid > material[type(position.squares[to(mv)])].mid + 151)
             continue;
 
         ++nodes;
@@ -1528,7 +1578,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         if (checkers)
             extension++;
         else if (depth <= 2 && ply < 2 * root_depth && (type(mv) & CAPTURE) && (type(stack[ply].prev_move) & CAPTURE) &&
-                to(mv) == to(stack[ply].prev_move) && eval + material[type(position.squares[to(mv)])] > alpha - 27 && eval < beta + 26)
+                to(mv) == to(stack[ply].prev_move) && eval + material[type(position.squares[to(mv)])].mid > alpha - 27 && eval < beta + 26)
             extension++;
         else if (!(type(mv) & CAPTURE) && type(position.squares[from(mv)]) == PAWN && ply < 2 * root_depth &&
                 (bb(to(mv)) & (position.next == WHITE ? 0x00ffffff00000000ULL : 0x00000000ffffff00ULL)) &&
@@ -1717,12 +1767,12 @@ double evaluation_error()
                 position.set(sq, pos.first.squares[sq]);
         }
 
-        error += std::pow(pos.second * 0.5 - 1. / (1. + std::pow(0.99511, evaluate())), 2);
+        error += std::pow(pos.second * 0.5 - 1. / (1. + std::pow(0.99507, evaluate())), 2);
     }
     return error / tuning_positions.size();
 }
 
-bool find_best_value(std::pair<int*, double>& variable, double& best_error, int start_delta)
+bool find_best_value(std::pair<std::int16_t*, double>& variable, double& best_error, int start_delta)
 {
     double start_error = best_error;
     for (int delta = start_delta; delta > 0; delta /= 2)
@@ -1788,16 +1838,26 @@ int main()
     double best_error = evaluation_error();
     std::cout << std::fixed << std::setprecision(4) << (10000. * best_error) << std::endl;
 
-    std::vector<std::pair<int*, double>> variables;
+    std::vector<std::pair<std::int16_t*, double>> variables;
+    variables.push_back({&material[0].end, 0});
     for (int i = 1; i < 5; i++)
-        variables.push_back({&material[i], 0});
+    {
+        variables.push_back({&material[i].mid, 0});
+        variables.push_back({&material[i].end, 0});
+    }
     for (auto& table : piece_square_table)
     {
-        for (int& v : table)
-            variables.push_back({&v, 0});
+        for (Score& v : table)
+        {
+            variables.push_back({&v.mid, 0});
+            variables.push_back({&v.end, 0});
+        }
     }
-    for (int& v : pawn_evals)
-        variables.push_back({&v, 0});
+    for (Score& v : pawn_evals)
+    {
+        variables.push_back({&v.mid, 0});
+        variables.push_back({&v.end, 0});
+    }
 
     for (int k = 0; k < 12; k++)
     {
@@ -1816,7 +1876,7 @@ int main()
 
             std::sort(
                 variables.begin(), variables.end(),
-                [](const std::pair<int*, double>& lhs, const std::pair<int*, double>& rhs) { return lhs.second > rhs.second; }
+                [](const std::pair<int16_t*, double>& lhs, const std::pair<int16_t*, double>& rhs) { return lhs.second > rhs.second; }
             );
 
             double cutoff = variables.front().second * std::pow(2., -n - 1.);
@@ -1830,7 +1890,7 @@ int main()
     }
 
     std::cout << std::fixed << std::setprecision(4) << (10000. * best_error) << std::endl;
-    std::cout << "int material[6] = {";
+    std::cout << "Score material[6] = {";
     for (int i = 0; i < 6; i++)
     {
         if (i > 0)
@@ -1838,7 +1898,7 @@ int main()
         std::cout << material[i];
     }
     std::cout << "};" << std::endl;
-    std::cout << "int piece_square_table[6][64] =\n";
+    std::cout << "Score piece_square_table[6][64] =\n";
     std::cout << "{\n";
     for (int i = 0; i < 6; i++)
     {
@@ -1853,7 +1913,7 @@ int main()
     }
     std::cout << "};" << std::endl;
     int pe_len = sizeof(pawn_evals) / sizeof(pawn_evals[0]);
-    std::cout << "int pawn_evals[" << pe_len << "] = {";
+    std::cout << "Score pawn_evals[" << pe_len << "] = {";
     for (int i = 0; i < pe_len; i++)
     {
         if (i > 0)

@@ -272,6 +272,15 @@ inline BitBoard shift_signed(BitBoard b)
         return b >> -Offset;
 }
 
+template<int Offset>
+inline BitBoard smear(BitBoard b)
+{
+    b |= shift_signed<Offset>(b);
+    b |= shift_signed<Offset * 2>(b);
+    b |= shift_signed<Offset * 4>(b);
+    return b;
+}
+
 enum MoveType : std::uint8_t { EN_PASSANT = 1, CASTLING = 2, PROMOTION = 4, CAPTURE = 8, INVALID_TYPE = 15 };
 
 inline MoveType& operator|=(MoveType& lhs, MoveType rhs) { return lhs = static_cast<MoveType>(lhs | rhs); }
@@ -1187,23 +1196,43 @@ Move MoveGen::next()
 #ifndef TUNE
 constexpr
 #endif
-Score pawn_evals[1] = {{13, 9}};
+Score pawn_evals[2] = {{13, 9}, {10, 20}};
 
 template<Color C>
-Score evaluate_player()
+Score evaluate_pawns()
 {
     constexpr int FWD = C == WHITE ? 8 : -8;
-    BitBoard pawns = position.type_bb[PAWN] & position.color_bb[C];
-    BitBoard attack = shift_signed<FWD - 1>(pawns & ~FILE_A) | shift_signed<FWD + 1>(pawns & ~FILE_H);
+    BitBoard own_pawns = position.type_bb[PAWN] & position.color_bb[C];
+    BitBoard opp_pawns = position.type_bb[PAWN] & position.color_bb[~C];
+    BitBoard own_attack = shift_signed<FWD - 1>(own_pawns & ~FILE_A) | shift_signed<FWD + 1>(own_pawns & ~FILE_H);
+    BitBoard opp_attack = shift_signed<-FWD - 1>(opp_pawns & ~FILE_A) | shift_signed<-FWD + 1>(opp_pawns & ~FILE_H);
     constexpr BitBoard CP_RANKS = static_cast<BitBoard>(C == WHITE ? 0x000000ffffff0000ULL : 0x0000ffffff000000ULL);
+    constexpr BitBoard PP_RANKS = static_cast<BitBoard>(C == WHITE ? 0x0000ffffff000000ULL : 0x000000ffffff0000ULL);
 
-    return position.piece_square_values[C] + pawn_evals[0] * popcount(pawns & CP_RANKS & attack);
+    return pawn_evals[0] * popcount(own_pawns & CP_RANKS & own_attack)
+            + pawn_evals[1] * popcount(own_pawns & PP_RANKS & ~smear<-FWD>(opp_pawns | opp_attack));
 }
+
+struct PawnEvalCache
+{
+    BitBoard pawns;
+    Score value;
+};
+
+static PawnEvalCache pawn_eval_cache;
 
 int evaluate()
 {
-    Score eval = evaluate_player<WHITE>() - evaluate_player<BLACK>();
-    Score result = Score{16, 8} + (position.next == WHITE ? eval : -eval);
+    Score pawn_eval;
+    if (position.type_bb[PAWN] == pawn_eval_cache.pawns)
+        pawn_eval = pawn_eval_cache.value;
+    else
+    {
+        pawn_eval_cache.pawns = position.type_bb[PAWN];
+        pawn_eval_cache.value = pawn_eval = evaluate_pawns<WHITE>() - evaluate_pawns<BLACK>();
+    }
+    Score result = Score{16, 8} + position.piece_square_values[position.next] - position.piece_square_values[~position.next] +
+            (position.next == WHITE ? pawn_eval : -pawn_eval);
     int pieces = popcount(position.all_bb()) - 1;
     return (pieces * result.mid + (32 - pieces) * result.end) / 32;
 }
@@ -1716,6 +1745,7 @@ void Search::iterate(int max_depth)
 
     for (root_depth = 1; root_depth <= max_depth; ++root_depth)
     {
+        pawn_eval_cache = {};
         sel_depth = 0;
 
         auto v = search(true, 0, root_depth, -SCORE_MATE, SCORE_MATE);

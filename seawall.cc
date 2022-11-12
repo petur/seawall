@@ -1681,7 +1681,11 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     }
 
     if (move_count == 0)
+    {
+        if (pv)
+            pv_lines[ply].length = 0;
         return {checkers ? -SCORE_MATE + ply : 0, NO_MOVE};
+    }
     if (ply > 0 && position.halfmove_clock >= 100)
         return {0, NULL_MOVE};
 

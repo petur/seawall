@@ -1437,10 +1437,12 @@ bool Search::check_time(int changes, int improving)
     if (total_time != static_cast<std::clock_t>(-1) && !stopped)
     {
         int pieces = popcount(position.color_bb[WHITE] | position.color_bb[BLACK]);
-        max_time = std::min(total_time, 20 * total_time / ((4 + ((changes <= 1) * std::max(0, improving - 1))) * (19 + pieces)) + 4 * increment);
+        max_time = std::min(
+            total_time,
+            20 * total_time / ((4 + ((changes <= 1) * std::max(0, improving - 1))) * std::min(19 + pieces, 5 * moves_to_go)) + 4 * increment);
         std::clock_t target_time = std::min(
             max_time,
-            36 * total_time / ((4 + ((changes <= 1) * std::max(0, improving - 1))) * std::min(20 * std::max(16, pieces), 11 * moves_to_go))
+            36 * total_time / ((4 + ((changes <= 1) * std::max(0, improving - 1))) * std::min(20 * std::max(16, pieces), 12 * moves_to_go))
                     + 16 * increment / (32 + pieces));
 
         if (std::clock() - start > target_time)

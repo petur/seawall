@@ -1236,8 +1236,8 @@ int evaluate()
     }
     Score result = Score{16, 8} + position.piece_square_values[position.next] - position.piece_square_values[~position.next] +
             (position.next == WHITE ? pawn_eval : -pawn_eval);
-    int pieces = popcount(position.all_bb()) - 1;
-    return (pieces * result.mid + (32 - pieces) * result.end) / 32;
+    int pieces = 2 * popcount(position.all_bb()) + popcount(position.all_bb() & ~position.type_bb[PAWN]) - 3;
+    return (pieces * result.mid + (80 - pieces) * result.end) / 80;
 }
 
 constexpr int SCORE_MATE = 32767;

@@ -1224,6 +1224,53 @@ struct PawnEvalCache
 
 static PawnEvalCache pawn_eval_cache;
 
+static constexpr int pawnless_king_table[64] =
+{
+    -42, -44, -12, -4, -4, -12, -44, -42,
+    -44, -4, 4, 6, 6, 4, -4, -44,
+    -12, 4, 8, 12, 12, 8, 4, -12,
+    -4, 6, 12, 13, 13, 12, 6, -4,
+    -4, 6, 12, 13, 13, 12, 6, -4,
+    -12, 4, 8, 12, 12, 8, 4, -12,
+    -44, -4, 4, 6, 6, 4, -4, -44,
+    -42, -44, -12, -4, -4, -12, -44, -42,
+};
+
+int evaluate_pawnless(int v)
+{
+    int piece_count = popcount(position.all_bb());
+    if (piece_count <= 4 &&
+            !(position.type_bb[PAWN] | position.type_bb[ROOK] | position.type_bb[QUEEN]))
+    {
+        if (popcount(position.color_bb[WHITE]) <= 2 && popcount(position.color_bb[BLACK]) <= 2)
+            return 0;
+        if (!position.type_bb[BISHOP])
+            return 0;
+    }
+
+    Square own_king_sq = first_square(position.type_bb[KING] & position.color_bb[position.next]);
+    Square opp_king_sq = first_square(position.type_bb[KING] & position.color_bb[~position.next]);
+    int king_value = pawnless_king_table[own_king_sq] - pawnless_king_table[opp_king_sq];
+
+    if (piece_count == 4 && (position.type_bb[ROOK] & position.color_bb[WHITE]) && (position.type_bb[ROOK] & position.color_bb[BLACK]))
+    {
+        v /= 32;
+        v += king_value / 8;
+        v += 2;
+    }
+    else
+    {
+        if (std::abs(v) < material[PAWN].end)
+            v /= 8;
+        else if (std::abs(v) < 2 * material[PAWN].end)
+            v /= 4;
+        v += king_value;
+        v += 8;
+    }
+
+    return v;
+}
+
 int evaluate()
 {
     Score pawn_eval;
@@ -1237,7 +1284,10 @@ int evaluate()
     Score result = Score{16, 8} + position.piece_square_values[position.next] - position.piece_square_values[~position.next] +
             (position.next == WHITE ? pawn_eval : -pawn_eval);
     int pieces = 2 * popcount(position.all_bb()) + popcount(position.all_bb() & ~position.type_bb[PAWN]) - 3;
-    return (pieces * result.mid + (80 - pieces) * result.end) / 80;
+    int v = (pieces * result.mid + (80 - pieces) * result.end) / 80;
+    if (!position.type_bb[PAWN])
+        return evaluate_pawnless(v);
+    return v;
 }
 
 constexpr int SCORE_MATE = 32767;

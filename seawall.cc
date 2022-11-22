@@ -453,6 +453,7 @@ alignas(64) static BitBoard pawn_attack[2][64];
 alignas(64) static BitBoard pawn_push[2][64];
 alignas(64) static BitBoard pawn_double_push[2][64];
 alignas(64) static BitBoard ray[64][8];
+alignas(64) static BitBoard king_threat[64];
 
 struct LineMask
 {
@@ -542,6 +543,17 @@ void init_bitboards()
 
         knight_attack[sq] = offset_bitboard(file, rank, knight_offsets);
         king_attack[sq] = offset_bitboard(file, rank, king_offsets);
+
+        king_threat[sq] = king_attack[sq];
+        if (file > 1)
+            king_threat[sq] |= king_threat[sq] >> 1;
+        if (file < 6)
+            king_threat[sq] |= king_threat[sq] << 1;
+        if (rank > 1)
+            king_threat[sq] |= king_threat[sq] >> 8;
+        if (rank < 6)
+            king_threat[sq] |= king_threat[sq] << 8;
+        king_threat[sq] &= ~bb(sq);
 
         for (Color c : {WHITE, BLACK})
         {
@@ -1271,18 +1283,43 @@ int evaluate_pawnless(int v)
     return v;
 }
 
+template<Color C>
+Score evaluate_king()
+{
+    Square king_sq = first_square(position.type_bb[KING] & position.color_bb[C]);
+    int own_near_pawns = popcount(position.type_bb[PAWN] & position.color_bb[C] & king_attack[king_sq]);
+    int opp_near_pawns = popcount(position.type_bb[PAWN] & position.color_bb[~C] & king_attack[king_sq]);
+    int own_far_pawns = popcount(position.type_bb[PAWN] & position.color_bb[C] & king_threat[king_sq] & ~king_attack[king_sq]);
+    int opp_far_pawns = popcount(position.type_bb[PAWN] & position.color_bb[~C] & king_threat[king_sq] & ~king_attack[king_sq]);
+    int own_near_pieces = popcount(~position.type_bb[PAWN] & position.color_bb[C] & king_attack[king_sq]);
+    int opp_near_pieces = popcount(~position.type_bb[PAWN] & position.color_bb[~C] & king_attack[king_sq]);
+    int own_far_pieces = popcount(~position.type_bb[PAWN] & position.color_bb[C] & king_threat[king_sq] & ~king_attack[king_sq]);
+    int opp_far_pieces = popcount(~position.type_bb[PAWN] & position.color_bb[~C] & king_threat[king_sq] & ~king_attack[king_sq]);
+
+    return Score{10, 7} * own_near_pawns
+        + Score{17, 29} * opp_near_pawns
+        + Score{5, 8} * own_far_pawns
+        + Score{-6, 9} * opp_far_pawns
+        + Score{2, -6} * own_near_pieces
+        + Score{5, 8} * opp_near_pieces
+        + Score{1, 0} * own_far_pieces
+        + Score{-17, 5} * opp_far_pieces;
+}
+
 int evaluate()
 {
-    Score pawn_eval;
+    Score eval;
     if (position.type_bb[PAWN] == pawn_eval_cache.pawns)
-        pawn_eval = pawn_eval_cache.value;
+        eval = pawn_eval_cache.value;
     else
     {
         pawn_eval_cache.pawns = position.type_bb[PAWN];
-        pawn_eval_cache.value = pawn_eval = evaluate_pawns<WHITE>() - evaluate_pawns<BLACK>();
+        pawn_eval_cache.value = eval = evaluate_pawns<WHITE>() - evaluate_pawns<BLACK>();
     }
-    Score result = Score{16, 8} + position.piece_square_values[position.next] - position.piece_square_values[~position.next] +
-            (position.next == WHITE ? pawn_eval : -pawn_eval);
+    eval += evaluate_king<WHITE>() - evaluate_king<BLACK>();
+    eval += position.piece_square_values[WHITE] - position.piece_square_values[BLACK];
+    Score result = Score{16, 8} + (position.next == WHITE ? eval : -eval);
+
     int pieces = 2 * popcount(position.all_bb()) + popcount(position.all_bb() & ~position.type_bb[PAWN]) - 3;
     int v = (pieces * result.mid + (80 - pieces) * result.end) / 80;
     if (!position.type_bb[PAWN])
@@ -1907,6 +1944,7 @@ int main()
     std::cout << "# seawall " STRINGIFY(SEAWALL_VERSION) << std::endl;
 
 #ifdef TUNE
+    init_bitboards();
     int pos_count = 0;
     while (getline(std::cin, line))
     {

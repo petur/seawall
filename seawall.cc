@@ -1283,32 +1283,43 @@ int evaluate_pawnless(int v)
     return v;
 }
 
+alignas(64)
 #ifndef TUNE
 constexpr
 #endif
-Score king_evals[8] = {{15, 11}, {12, 69}, {5, 8}, {-21, 24}, {2, -3}, {-2, 15}, {1, 0}, {-20, 10}};
+Score king_evals[8][4] =
+{
+    {{-28, -21}, {-14, 4}, {8, 6}, {19, 5}},
+    {{-19, -84}, {-17, 1}, {2, 36}, {4, 19}},
+    {{-3, -16}, {-7, 2}, {5, 4}, {9, 26}},
+    {{18, -20}, {-15, 14}, {-8, 6}, {-10, 2}},
+    {{0, 0}, {-1, 1}, {2, -1}, {5, -1}},
+    {{7, -15}, {0, 3}, {-4, -2}, {-4, -4}},
+    {{-5, -2}, {0, 0}, {2, 0}, {3, -3}},
+    {{19, -8}, {-6, 9}, {-34, 10}, {-4, -1}},
+};
 
 template<Color C>
 Score evaluate_king()
 {
     Square king_sq = first_square(position.type_bb[KING] & position.color_bb[C]);
-    int own_near_pawns = popcount(position.type_bb[PAWN] & position.color_bb[C] & king_attack[king_sq]);
-    int opp_near_pawns = popcount(position.type_bb[PAWN] & position.color_bb[~C] & king_attack[king_sq]);
-    int own_far_pawns = popcount(position.type_bb[PAWN] & position.color_bb[C] & king_threat[king_sq] & ~king_attack[king_sq]);
-    int opp_far_pawns = popcount(position.type_bb[PAWN] & position.color_bb[~C] & king_threat[king_sq] & ~king_attack[king_sq]);
-    int own_near_pieces = popcount(~position.type_bb[PAWN] & position.color_bb[C] & king_attack[king_sq]);
-    int opp_near_pieces = popcount(~position.type_bb[PAWN] & position.color_bb[~C] & king_attack[king_sq]);
-    int own_far_pieces = popcount(~position.type_bb[PAWN] & position.color_bb[C] & king_threat[king_sq] & ~king_attack[king_sq]);
-    int opp_far_pieces = popcount(~position.type_bb[PAWN] & position.color_bb[~C] & king_threat[king_sq] & ~king_attack[king_sq]);
+    alignas(32) int v[8] = {
+        popcount(position.type_bb[PAWN] & position.color_bb[C] & king_attack[king_sq]),
+        popcount(position.type_bb[PAWN] & position.color_bb[~C] & king_attack[king_sq]),
+        popcount(position.type_bb[PAWN] & position.color_bb[C] & king_threat[king_sq] & ~king_attack[king_sq]),
+        popcount(position.type_bb[PAWN] & position.color_bb[~C] & king_threat[king_sq] & ~king_attack[king_sq]),
+        popcount(~position.type_bb[PAWN] & position.color_bb[C] & king_attack[king_sq]),
+        popcount(~position.type_bb[PAWN] & position.color_bb[~C] & king_attack[king_sq]),
+        popcount(~position.type_bb[PAWN] & position.color_bb[C] & king_threat[king_sq] & ~king_attack[king_sq]),
+        popcount(~position.type_bb[PAWN] & position.color_bb[~C] & king_threat[king_sq] & ~king_attack[king_sq]),
+    };
 
-    return king_evals[0] * own_near_pawns
-        + king_evals[1] * opp_near_pawns
-        + king_evals[2] * own_far_pawns
-        + king_evals[3] * opp_far_pawns
-        + king_evals[4] * own_near_pieces
-        + king_evals[5] * opp_near_pieces
-        + king_evals[6] * own_far_pieces
-        + king_evals[7] * opp_far_pieces;
+    Score r{0, 0};
+    for (int i = 0; i < 8; i++)
+    {
+        r += king_evals[i][std::min(3, v[i])];
+    }
+    return r;
 }
 
 int evaluate()
@@ -1990,10 +2001,13 @@ int main()
         variables.push_back({&v.mid, 0});
         variables.push_back({&v.end, 0});
     }
-    for (Score& v : king_evals)
+    for (auto& row : king_evals)
     {
-        variables.push_back({&v.mid, 0});
-        variables.push_back({&v.end, 0});
+        for (Score& v : row)
+        {
+            variables.push_back({&v.mid, 0});
+            variables.push_back({&v.end, 0});
+        }
     }
 
     for (int k = 0; k < 4; k++)
@@ -2059,12 +2073,19 @@ int main()
     }
     std::cout << "};" << std::endl;
     int ke_len = sizeof(king_evals) / sizeof(king_evals[0]);
-    std::cout << "Score king_evals[" << ke_len << "] = {";
+    int ke_len2 = sizeof(king_evals[0]) / sizeof(king_evals[0][0]);
+    std::cout << "Score king_evals[" << ke_len << "][" << ke_len2 << "] =\n";
+    std::cout << "{\n";
     for (int i = 0; i < ke_len; i++)
     {
-        if (i > 0)
-            std::cout << ", ";
-        std::cout << king_evals[i];
+        std::cout << "    {";
+        for (int j = 0; j < ke_len2; j++)
+        {
+            if (j > 0)
+                std::cout << ", ";
+            std::cout << king_evals[i][j];
+        }
+        std::cout << "},\n";
     }
     std::cout << "};" << std::endl;
     return 0;

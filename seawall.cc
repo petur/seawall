@@ -1388,7 +1388,7 @@ int hash_score(int depth, HashFlags flags)
 
 void save_hash(int value, int ply, int depth, Move mv, int alpha, int beta)
 {
-    HashFlags flags = static_cast<HashFlags>(hash_generation & GEN_MASK);
+    HashFlags flags = static_cast<HashFlags>(hash_generation);
     if (value > alpha)
         flags |= LOWER;
     if (value < beta)
@@ -2148,6 +2148,7 @@ int main()
         {
             if (hash_table)
                 std::fill_n(hash_table, hash_size, HashEntry{});
+            hash_generation = 0;
             for (Color c : {WHITE, BLACK})
                 std::fill_n(history[c], FROM_TO_SIZE, MoveHistory{});
             for (int c = PAWN; c < KING; c++)
@@ -2212,7 +2213,7 @@ int main()
                     parser >> moves_to_go;
             }
 
-            ++hash_generation;
+            hash_generation = ((hash_generation + 1) & GEN_MASK);
             Search{std::cin, std::cout, commands, time, inc, movetime, moves_to_go, &stack[position.halfmove_clock]}.iterate(max_depth);
         }
         else if (token == "quit")

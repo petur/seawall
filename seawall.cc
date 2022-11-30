@@ -1692,6 +1692,9 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         }
     }
 
+    if (!he && !checkers && eval > alpha && depth > 1)
+        depth--;
+
     MoveGen gen{QUIETS, checkers, prev_best, stack[ply]};
     Move best = NULL_MOVE;
     int orig_alpha = alpha;

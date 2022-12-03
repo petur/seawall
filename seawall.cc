@@ -1409,9 +1409,15 @@ static HashEntry* hash_table;
 static std::size_t hash_size;
 static int hash_generation;
 
-std::size_t hash_index(const Position& position)
+std::uint64_t hash_key(const Position& position, Move skip_move)
 {
-    return ((position.hash() & 0xffffffffULL) * hash_size) >> 32;
+    std::uint64_t sm = skip_move ? 0x762e9afcb08cafe2ULL ^ skip_move : 0ULL;
+    return position.hash() ^ sm;
+}
+
+std::size_t hash_index(std::uint64_t hk)
+{
+    return ((hk & 0xffffffffULL) * hash_size) >> 32;
 }
 
 int hash_score(int depth, HashFlags flags)
@@ -1421,7 +1427,7 @@ int hash_score(int depth, HashFlags flags)
     return depth;
 }
 
-void save_hash(int value, int ply, int depth, Move mv, int alpha, int beta)
+void save_hash(int value, int ply, int depth, Move mv, int alpha, int beta, Move skip_move)
 {
     HashFlags flags = static_cast<HashFlags>(hash_generation);
     if (value > alpha)
@@ -1432,16 +1438,19 @@ void save_hash(int value, int ply, int depth, Move mv, int alpha, int beta)
         value += ply;
     else if (value < -SCORE_WIN)
         value -= ply;
-    HashEntry& e = hash_table[hash_index(position)];
-    std::uint16_t key = static_cast<std::uint16_t>(position.hash() >> 48);
+
+    std::uint64_t hk = hash_key(position, skip_move);
+    HashEntry& e = hash_table[hash_index(hk)];
+    std::uint16_t key = static_cast<std::uint16_t>(hk >> 48);
     if (hash_score(e.depth, e.flags) <= hash_score(depth, flags) || (e.key != key && e.generation() != hash_generation))
         e = HashEntry{key, static_cast<std::int16_t>(value), mv, static_cast<std::int8_t>(depth), flags};
 }
 
-HashEntry* load_hash()
+HashEntry* load_hash(Move skip_move)
 {
-    HashEntry* e = &hash_table[hash_index(position)];
-    if (e->key != static_cast<uint16_t>(position.hash() >> 48) ||
+    std::uint64_t hk = hash_key(position, skip_move);
+    HashEntry* e = &hash_table[hash_index(hk)];
+    if (e->key != static_cast<uint16_t>(hk >> 48) ||
             (e->best_move && !(position.color_bb[position.next] & from(e->best_move))))
         return nullptr;
     return e;
@@ -1508,7 +1517,7 @@ struct Search
     bool check_time(int changes, int improving);
 
     int qsearch(int ply, int depth, int alpha, int beta);
-    std::pair<int, Move> search(bool pv, int ply, int depth, int alpha, int beta);
+    std::pair<int, Move> search(bool pv, int ply, int depth, int alpha, int beta, Move skip_move = NULL_MOVE);
     void print_info(int depth, int score);
     void iterate(int max_depth);
 
@@ -1605,7 +1614,7 @@ int Search::qsearch(int ply, int depth, int alpha, int beta)
 
     Move best = NULL_MOVE;
 
-    HashEntry* he = load_hash();
+    HashEntry* he = load_hash(NULL_MOVE);
     if (he)
     {
         best = he->best_move;
@@ -1651,11 +1660,11 @@ int Search::qsearch(int ply, int depth, int alpha, int beta)
     }
 
     if (best)
-        save_hash(alpha, ply, 0, best, orig_alpha, beta);
+        save_hash(alpha, ply, 0, best, orig_alpha, beta, NULL_MOVE);
     return alpha;
 }
 
-std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int beta)
+std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int beta, Move skip_move)
 {
     if (ply > 0)
     {
@@ -1677,7 +1686,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     }
 
     Move prev_best = NULL_MOVE;
-    HashEntry* he = load_hash();
+    HashEntry* he = load_hash(skip_move);
     int hv = std::numeric_limits<int>::min();
     if (he)
     {
@@ -1740,6 +1749,11 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
 
     while (Move mv = gen.next())
     {
+        if (mv == skip_move)
+        {
+            gen.moves[gen.index - 1].move = NULL_MOVE;
+            continue;
+        }
         bool checks = is_check(mv, opp_king_sq);
         if (!checkers && !checks && move_count && depth <= 5 && eval < alpha - (depth * 223 - 141) && !(type(mv) & (CAPTURE | PROMOTION)))
             continue;
@@ -1762,6 +1776,18 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
                 (bb(to(mv)) & (position.next == WHITE ? 0x00ffffff00000000ULL : 0x00000000ffffff00ULL)) &&
                  !(ray[to(mv)][position.next == WHITE ? 5 : 1] & position.type_bb[PAWN]))
             extension++;
+        else if (!skip_move && mv == prev_best &&
+                he && (he->flags & LOWER) && he->value >= -SCORE_WIN &&
+                depth > 4 && ply < 2 * root_depth)
+        {
+            int sbeta = he->value - 5 * depth;
+            int sresult = search(false, ply, depth / 2, sbeta - 1, sbeta, prev_best).first;
+            if (sresult < sbeta)
+                extension++;
+            else if (sbeta >= beta)
+                extension--;
+        }
+
         int new_depth = depth + extension - 1;
 
         int reduction = 0;
@@ -1830,7 +1856,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     {
         if (pv)
             pv_lines[ply].length = 0;
-        return {checkers ? -SCORE_MATE + ply : 0, NO_MOVE};
+        return {skip_move ? alpha : checkers ? -SCORE_MATE + ply : 0, NO_MOVE};
     }
     if (ply > 0 && position.halfmove_clock >= 100)
         return {0, NULL_MOVE};
@@ -1857,7 +1883,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
             }
         }
     }
-    save_hash(alpha, ply, depth, best ? best : prev_best, orig_alpha, beta);
+    save_hash(alpha, ply, depth, best ? best : prev_best, orig_alpha, beta, skip_move);
 
     if (pv && alpha > orig_alpha && alpha < beta)
         update_pv(best, ply, depth <= 1);

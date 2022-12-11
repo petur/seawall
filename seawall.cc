@@ -1321,7 +1321,7 @@ Score king_evals[8][4] =
 };
 
 template<Color C>
-Score evaluate_king()
+Score evaluate_pieces()
 {
     Square king_sq = first_square(position.type_bb[KING] & position.color_bb[C]);
     alignas(32) int v[8] = {
@@ -1340,6 +1340,15 @@ Score evaluate_king()
     {
         r += king_evals[i][std::min(3, v[i])];
     }
+
+    if (position.type_bb[ROOK] && position.type_bb[PAWN])
+    {
+        constexpr int FWD = C == WHITE ? 8 : -8;
+        BitBoard own_rooks = position.type_bb[ROOK] & position.color_bb[C];
+
+        r += Score{25, 5} * popcount(own_rooks & ~smear<-FWD>(position.type_bb[PAWN]));
+    }
+
     return r;
 }
 
@@ -1353,7 +1362,7 @@ int evaluate()
         pawn_eval_cache.pawns = position.type_bb[PAWN];
         pawn_eval_cache.value = eval = evaluate_pawns<WHITE>() - evaluate_pawns<BLACK>();
     }
-    eval += evaluate_king<WHITE>() - evaluate_king<BLACK>();
+    eval += evaluate_pieces<WHITE>() - evaluate_pieces<BLACK>();
     eval += position.piece_square_values[WHITE] - position.piece_square_values[BLACK];
     Score result = Score{15, 9} + (position.next == WHITE ? eval : -eval);
 

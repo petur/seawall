@@ -1729,11 +1729,12 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         bool checks = is_check(mv, opp_king_sq);
         if (!checkers && !checks && move_count && depth <= 5 && eval < alpha - (depth * 223 - 141) && !(type(mv) & (CAPTURE | PROMOTION)))
             continue;
-        if (!checkers && !checks && depth <= 5 && alpha > -SCORE_WIN && eval < alpha - 32 - 23 * depth &&
-                !(type(mv) & (CAPTURE | PROMOTION)) && mv != prev_best && mv != stack[ply].killer_moves[0] && mv != stack[ply].killer_moves[1])
+        if (!checkers && !checks && depth <= 7 && alpha > -SCORE_WIN && eval < alpha - 32 - 15 * depth &&
+                !(type(mv) & (CAPTURE | PROMOTION)) && mv != prev_best && mv != stack[ply].killer_moves[0] && mv != stack[ply].killer_moves[1] &&
+                popcount(position.color_bb[~position.next] & ~position.type_bb[PAWN]) > 1)
         {
             ++mcp;
-            if (mcp > 4 * (depth - 1) + 2)
+            if (mcp > 3 * (depth - 1) + 1)
                 break;
         }
 

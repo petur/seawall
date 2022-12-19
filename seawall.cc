@@ -1014,6 +1014,17 @@ struct MoveHistory
 alignas(64) static MoveHistory history[2][FROM_TO_SIZE];
 alignas(64) static MoveHistory capture_history[30][64];
 
+constexpr int COUNTER_MOVE_SIZE = 2 * 6 * 64 + 1;
+alignas(64) static Move counter_moves[COUNTER_MOVE_SIZE];
+
+int counter_index(Move prev_move)
+{
+    if (!prev_move)
+        return COUNTER_MOVE_SIZE - 1;
+    PieceType moved = (type(prev_move) & PROMOTION) ? PAWN : type(position.squares[to(prev_move)]);
+    return to(prev_move) + 64 * position.next + 128 * moved;
+}
+
 enum MoveGenType { START, BEST, CAPTURES, QUIETS, END };
 
 struct alignas(4) RankedMove
@@ -1036,10 +1047,11 @@ struct MoveGen
     int index;
     BitBoard checkers;
     Move best_move;
+    Move counter_move;
     const Stack& stack;
 
-    explicit MoveGen(MoveGenType w, BitBoard ch, Move best, const Stack& st)
-        : wanted{w}, generated{best ? START : BEST}, moves{}, count{}, index{}, checkers{ch}, best_move{best}, stack{st} {}
+    explicit MoveGen(MoveGenType w, BitBoard ch, Move best, Move cm, const Stack& st)
+        : wanted{w}, generated{best ? START : BEST}, moves{}, count{}, index{}, checkers{ch}, best_move{best}, counter_move{cm}, stack{st} {}
 
     Move next();
 
@@ -1169,6 +1181,8 @@ std::int16_t MoveGen::rank_quiet(Move mv) const
     std::int16_t rank = history[position.next][mv & FROM_TO_MASK].value;
     if (mv == stack.killer_moves[0] || mv == stack.killer_moves[1])
         rank += 16354;
+    if (mv == counter_move)
+        rank += 2048;
     return rank;
 }
 
@@ -1626,7 +1640,7 @@ int Search::qsearch(int ply, int depth, int alpha, int beta)
         }
     }
 
-    MoveGen gen{checkers ? QUIETS : CAPTURES, checkers, best, stack[ply]};
+    MoveGen gen{checkers ? QUIETS : CAPTURES, checkers, best, NULL_MOVE, stack[ply]};
 
     while (Move mv = gen.next())
     {
@@ -1739,7 +1753,8 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     if (!he && !checkers && eval > alpha && depth > 1)
         depth--;
 
-    MoveGen gen{QUIETS, checkers, prev_best, stack[ply]};
+    Move& counter_move = counter_moves[counter_index(stack[ply].prev_move)];
+    MoveGen gen{QUIETS, checkers, prev_best, counter_move, stack[ply]};
     Move best = NULL_MOVE;
     int orig_alpha = alpha;
     Square opp_king_sq = first_square(position.type_bb[KING] & position.color_bb[~position.next]);
@@ -1865,7 +1880,11 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     if (alpha >= beta)
     {
         if (!(type(best) & CAPTURE))
+        {
             stack[ply].save_killer(best);
+            if (stack[ply].prev_move)
+                counter_move = best;
+        }
         if (depth > 1)
         {
             int inc = 430 + 40 * depth;
@@ -2237,6 +2256,7 @@ int main()
             for (int c = PAWN; c < KING; c++)
                 for (int m = PAWN; m <= KING; m++)
                     std::fill_n(capture_history[6 * c + m], 64, MoveHistory{static_cast<std::int16_t>(384 - m)});
+            std::fill_n(counter_moves, COUNTER_MOVE_SIZE, NULL_MOVE);
         }
         else if (token == "position")
         {

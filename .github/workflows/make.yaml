@@ -51,7 +51,7 @@ jobs:
       run: |
         make CXX=${{ matrix.platform.cxx }} LLVM_PROFDATA=${{ matrix.platform.llvm_profdata }} \
           ARCH=${{ matrix.platform.arch }} LDFLAGS='-static -s' SUFFIX=${{ matrix.platform.suffix }}
-        echo "::set-output name=artifact::$(basename -s .exe out/seawall-*)"
+        echo "artifact=$(basename -s .exe out/seawall-*)" >> $GITHUB_OUTPUT
     - uses: actions/upload-artifact@v3
       with:
         name: ${{ steps.make.outputs.artifact }}

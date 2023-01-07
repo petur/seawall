@@ -1337,7 +1337,7 @@ Score king_evals[8][4] =
 #ifndef TUNE
 constexpr
 #endif
-Score piece_evals[1] = {{43, 2}};
+Score piece_evals[2] = {{43, 2}, {35, 65}};
 
 template<Color C>
 Score evaluate_pieces()
@@ -1360,13 +1360,19 @@ Score evaluate_pieces()
         r += king_evals[i][std::min(3, v[i])];
     }
 
+    constexpr int FWD = C == WHITE ? 8 : -8;
+
     if (position.type_bb[ROOK] && position.type_bb[PAWN])
     {
-        constexpr int FWD = C == WHITE ? 8 : -8;
         BitBoard own_rooks = position.type_bb[ROOK] & position.color_bb[C];
 
         r += piece_evals[0] * popcount(own_rooks & ~smear<-FWD>(position.type_bb[PAWN]));
     }
+
+    BitBoard own_pawns = position.type_bb[PAWN] & position.color_bb[C];
+    BitBoard own_attack = shift_signed<FWD - 1>(own_pawns & ~FILE_A) | shift_signed<FWD + 1>(own_pawns & ~FILE_H);
+
+    r += piece_evals[1] * popcount(own_attack & position.color_bb[~C] & ~position.type_bb[PAWN]);
 
     return r;
 }

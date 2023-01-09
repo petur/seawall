@@ -234,7 +234,8 @@ std::ostream& operator<<(std::ostream& out, Square sq)
 
 enum BitBoard : std::uint64_t
 {
-    EMPTY = 0, FILE_A = 0x0101010101010101ULL, FILE_H = FILE_A << 7, RANK_1 = 0x00000000000000ffULL, RANK_8 = RANK_1 << 56, ALL = ~0ULL
+    EMPTY = 0, FILE_A = 0x0101010101010101ULL, FILE_B = FILE_A << 1, FILE_G = FILE_A << 6, FILE_H = FILE_A << 7,
+    RANK_1 = 0x00000000000000ffULL, RANK_8 = RANK_1 << 56, ALL = ~0ULL
 };
 
 inline BitBoard bb(Square s) { return static_cast<BitBoard>(1ULL << s); }
@@ -1337,7 +1338,18 @@ Score king_evals[8][4] =
 #ifndef TUNE
 constexpr
 #endif
-Score piece_evals[2] = {{45, 10}, {43, 69}};
+Score piece_evals[4] = {{45, 10}, {43, 69}, {6, 0}, {36, 34}};
+
+BitBoard knight_moves(BitBoard knights)
+{
+    BitBoard ud1 = shift_signed<8>(knights) | shift_signed<-8>(knights);
+    BitBoard ud2 = shift_signed<16>(knights) | shift_signed<-16>(knights);
+
+    return shift_signed<-2>(ud1 & ~(FILE_A | FILE_B))
+        | shift_signed<2>(ud1 & ~(FILE_G | FILE_H))
+        | shift_signed<-1>(ud2 & ~FILE_A)
+        | shift_signed<1>(ud2 & ~FILE_H);
+}
 
 template<Color C>
 Score evaluate_pieces()
@@ -1373,6 +1385,16 @@ Score evaluate_pieces()
     BitBoard own_attack = shift_signed<FWD - 1>(own_pawns & ~FILE_A) | shift_signed<FWD + 1>(own_pawns & ~FILE_H);
 
     r += piece_evals[1] * popcount(own_attack & position.color_bb[~C] & ~position.type_bb[PAWN]);
+    if (position.type_bb[KNIGHT])
+    {
+        BitBoard opp_pawns = position.type_bb[PAWN] & position.color_bb[~C];
+        BitBoard opp_attack = shift_signed<-FWD - 1>(opp_pawns & ~FILE_A) | shift_signed<-FWD + 1>(opp_pawns & ~FILE_H);
+
+        BitBoard km = knight_moves(position.color_bb[C] & position.type_bb[KNIGHT]);
+
+        r -= piece_evals[2] * popcount(km & opp_attack & ~(position.color_bb[~C] & ~position.type_bb[PAWN]));
+        r += piece_evals[3] * popcount(km & position.color_bb[~C] & ~(position.type_bb[PAWN] | position.type_bb[KNIGHT]));
+    }
 
     return r;
 }

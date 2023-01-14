@@ -1338,7 +1338,7 @@ Score king_evals[8][4] =
 #ifndef TUNE
 constexpr
 #endif
-Score piece_evals[4] = {{52, 8}, {51, 79}, {10, 3}, {44, 42}};
+Score piece_evals[6] = {{52, 8}, {51, 79}, {10, 3}, {44, 42}, {5, 0}, {6, 7}};
 
 BitBoard knight_moves(BitBoard knights)
 {
@@ -1390,10 +1390,15 @@ Score evaluate_pieces()
         BitBoard opp_pawns = position.type_bb[PAWN] & position.color_bb[~C];
         BitBoard opp_attack = shift_signed<-FWD - 1>(opp_pawns & ~FILE_A) | shift_signed<-FWD + 1>(opp_pawns & ~FILE_H);
 
-        BitBoard km = knight_moves(position.color_bb[C] & position.type_bb[KNIGHT]);
+        BitBoard knights = position.color_bb[C] & position.type_bb[KNIGHT];
+        BitBoard km = knight_moves(knights);
 
         r -= piece_evals[2] * popcount(km & opp_attack & ~(position.color_bb[~C] & ~position.type_bb[PAWN]));
         r += piece_evals[3] * popcount(km & position.color_bb[~C] & ~(position.type_bb[PAWN] | position.type_bb[KNIGHT]));
+        r -= piece_evals[4] * popcount(km & position.type_bb[PAWN] & (position.color_bb[C] | opp_attack));
+
+        constexpr BitBoard OUTPOST_RANKS = static_cast<BitBoard>(C == WHITE ? 0x00ffffff00000000ULL : 0x00000000ffffff00ULL);
+        r += piece_evals[5] * popcount((knights | (km & ~position.color_bb[C])) & own_attack & ~opp_attack & OUTPOST_RANKS);
     }
 
     return r;

@@ -11,4 +11,4 @@ c-chess-cli \
     -openings file=./books/training.fen order=random \
     -games 600 -concurrency 2 \
     -draw number=60 count=10 score=2 \
-    -sample freq=0.22 decay=0.024 resolve=y file="samples/$(date '+%Y%m%d-%H%M%S').csv" format=csv
+    -sample freq=0.21 decay=0.023 resolve=y file="samples/$(date '+%Y%m%d-%H%M%S').csv" format=csv

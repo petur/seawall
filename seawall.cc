@@ -1242,7 +1242,7 @@ Move MoveGen::next()
 #ifndef TUNE
 constexpr
 #endif
-Score pawn_evals[5] = {{18, 24}, {-12, 73}, {7, 12}, {19, 39}, {8, 49}};
+Score pawn_evals[6] = {{18, 24}, {-12, 73}, {7, 12}, {19, 39}, {8, 49}, {6, 6}};
 
 template<Color C>
 Score evaluate_pawns()
@@ -1261,7 +1261,8 @@ Score evaluate_pawns()
             + pawn_evals[1] * popcount(own_pawns & PP_RANKS & ~smear<-FWD>(opp_pawns | opp_attack))
             + pawn_evals[2] * popcount(own_pawns & adjacent)
             - pawn_evals[3] * popcount(own_pawns & shift_signed<FWD>(own_pawns))
-            + pawn_evals[4] * popcount(own_pawns & BP_RANKS & shift_signed<-FWD>(opp_pawns));
+            + pawn_evals[4] * popcount(own_pawns & BP_RANKS & shift_signed<-FWD>(opp_pawns))
+            - pawn_evals[5] * popcount(own_pawns & BP_RANKS & shift_signed<-FWD>(opp_attack) & ~adjacent & ~own_attack);
 }
 
 struct PawnEvalCache

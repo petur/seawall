@@ -1550,6 +1550,7 @@ struct Search
     std::clock_t max_time;
     std::clock_t start;
     long long nodes;
+    unsigned int time_mask;
     int root_depth;
     int sel_depth;
     bool stopped;
@@ -1563,6 +1564,7 @@ struct Search
     bool is_stopped();
     bool check_stop_command();
     bool check_time(int changes, int improving);
+    void set_time_mask(std::clock_t remaining);
 
     int qsearch(int ply, int depth, int alpha, int beta);
     std::pair<int, Move> search(bool pv, int ply, int depth, int alpha, int beta, Move skip_move = NULL_MOVE);
@@ -1584,7 +1586,7 @@ Search::Search(
     std::istream& i, std::ostream& o, std::deque<std::string>& cmd,
     std::clock_t time, std::clock_t inc, std::clock_t mt, int mtg, Stack* st)
     : in{i}, out{o}, commands{cmd}, total_time{time}, increment{inc}, movetime{mt}, moves_to_go{mtg}, max_time{mt},
-    start{std::clock()}, nodes{}, root_depth{}, sel_depth{}, stopped{}, best_move{}, stack{st}
+    start{std::clock()}, nodes{}, time_mask{0x1ff}, root_depth{}, sel_depth{}, stopped{}, best_move{}, stack{st}
 {
     if (total_time != static_cast<std::clock_t>(-1))
     {
@@ -1595,14 +1597,19 @@ Search::Search(
 
 bool Search::is_stopped()
 {
-    if (!stopped && (nodes & 0xff) == 0)
+    if (!stopped && (nodes & time_mask) == 0)
     {
-        if (std::clock() - start > max_time)
+        std::clock_t elapsed = std::clock() - start;
+        if (elapsed > max_time)
             stopped = true;
-        else if ((nodes & 0x3ffff) == 0)
+        else
         {
-            if (check_stop_command())
-                stopped = true;
+            set_time_mask(max_time - elapsed);
+            if ((nodes & 0x7ffff) == 0)
+            {
+                if (check_stop_command())
+                    stopped = true;
+            }
         }
     }
     return stopped;
@@ -1640,10 +1647,31 @@ bool Search::check_time(int changes, int improving)
             36 * total_time / ((4 + ((changes <= 1) * std::max(0, improving - 1))) * std::min(20 * std::max(16, pieces), 13 * moves_to_go))
                     + 16 * increment / (32 + pieces));
 
-        if (std::clock() - start > target_time)
+        std::clock_t elapsed = std::clock() - start;
+        if (elapsed > target_time)
             stopped = true;
+
+        set_time_mask(max_time - elapsed);
     }
     return stopped;
+}
+
+void Search::set_time_mask(std::clock_t remaining)
+{
+    if (remaining < CLOCKS_PER_SEC / 512)
+        time_mask = 0x1ff;
+    else if (remaining < CLOCKS_PER_SEC / 128)
+        time_mask = 0x3ff;
+    else if (remaining < CLOCKS_PER_SEC / 32)
+        time_mask = 0x7ff;
+    else if (remaining < CLOCKS_PER_SEC / 8)
+        time_mask = 0xfff;
+    else if (remaining < CLOCKS_PER_SEC / 2)
+        time_mask = 0x1fff;
+    else if (remaining < CLOCKS_PER_SEC * 2)
+        time_mask = 0x3fff;
+    else
+        time_mask = 0x7fff;
 }
 
 int Search::qsearch(int ply, int depth, int alpha, int beta)

@@ -1870,7 +1870,13 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         int reduction = 0;
         if (new_depth >= 3 && move_count && !checkers && !(type(mv) & (CAPTURE | PROMOTION)) &&
                 mv != prev_best && mv != stack[ply].killer_moves[0] && mv != stack[ply].killer_moves[1])
-            reduction = std::clamp(move_count / 4 + (he && !(he->flags & LOWER)), 0, depth / 3);
+        {
+            reduction = move_count - 2;
+            if (he && !(he->flags & LOWER))
+                reduction += 4;
+            reduction -= history[position.next][mv & FROM_TO_MASK].value / 2048;
+            reduction = std::clamp(reduction / 4, 0, depth / 3);
+        }
 
         ++nodes;
         ++move_count;

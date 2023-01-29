@@ -2074,64 +2074,6 @@ void Search::iterate(int max_depth)
     out << "bestmove " << best_move << std::endl;
 }
 
-#ifdef TUNE
-std::vector<std::pair<Position, double>> tuning_positions;
-
-constexpr double lambda = .5;
-constexpr double sig_r = 0.9948;
-
-inline double sigmoid(double eval)
-{
-    return 1. / (1. + std::pow(sig_r, eval));
-}
-
-double evaluation_error()
-{
-    double error_sum = 0.;
-    for (auto& pos : tuning_positions)
-    {
-        position.reset();
-        position.next = pos.first.next;
-        position.halfmove_clock = pos.first.halfmove_clock;
-
-        BitBoard occ = pos.first.all_bb();
-        while (occ)
-        {
-            Square sq = pop(occ);
-            position.set(sq, pos.first.squares[sq]);
-        }
-
-        double err = pos.second - sigmoid(evaluate());
-        error_sum += err * err;
-    }
-    return error_sum / tuning_positions.size();
-}
-
-bool find_best_value(std::pair<std::int16_t*, double>& variable, double& best_error, int start_delta)
-{
-    double start_error = best_error;
-    for (int delta = start_delta; delta > 0; delta /= 2)
-    {
-        for (int sd : {-delta, delta})
-        {
-            int prev_value = *variable.first;
-            *variable.first += sd;
-            double error = evaluation_error();
-            if (error >= best_error)
-                *variable.first = prev_value;
-            else
-            {
-                best_error = error;
-                break;
-            }
-        }
-    }
-    variable.second = start_error - best_error;
-    std::cout << std::fixed << std::setprecision(4) << (10000. * best_error) << std::endl;
-    return best_error < start_error;
-}
-#endif
-
 constexpr char startfen[] = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 bool get_command(std::istream& in, std::deque<std::string>& commands, std::string& line)
@@ -2143,165 +2085,9 @@ bool get_command(std::istream& in, std::deque<std::string>& commands, std::strin
     return true;
 }
 
-int main()
+void uci_main()
 {
-    std::ios::sync_with_stdio(false);
     std::string line;
-
-    std::cout << "# seawall " STRINGIFY(SEAWALL_VERSION) << std::endl;
-
-#ifdef TUNE
-    init_bitboards();
-    int pos_count = 0;
-    while (getline(std::cin, line))
-    {
-        ++pos_count;
-        std::istringstream parser{line};
-        position.parse(parser);
-        int score, result;
-        parser.ignore();
-        parser >> score;
-        parser.ignore();
-        parser >> result;
-
-        if (!position.type_bb[PAWN] && (pos_count & 1))
-            continue;
-        if (popcount(position.all_bb()) <= 5)
-            continue;
-        if (position.fullmove_counter <= 8)
-            continue;
-        if (position.castling && (pos_count & 2))
-            continue;
-        tuning_positions.push_back({position, (1. - lambda) * result * 0.5 + lambda * sigmoid(score)});
-    }
-
-    double best_error = evaluation_error();
-    std::cout << std::fixed << std::setprecision(4) << (10000. * best_error) << std::endl;
-
-    std::vector<std::pair<std::int16_t*, double>> variables;
-    variables.push_back({&material[0].end, 0});
-    for (int i = 1; i < 5; i++)
-    {
-        variables.push_back({&material[i].mid, 0});
-        variables.push_back({&material[i].end, 0});
-    }
-    for (auto& table : piece_square_table)
-    {
-        for (Score& v : table)
-        {
-            variables.push_back({&v.mid, 0});
-            variables.push_back({&v.end, 0});
-        }
-    }
-    for (Score& v : pawn_evals)
-    {
-        variables.push_back({&v.mid, 0});
-        variables.push_back({&v.end, 0});
-    }
-    for (auto& row : king_evals)
-    {
-        for (Score& v : row)
-        {
-            variables.push_back({&v.mid, 0});
-            variables.push_back({&v.end, 0});
-        }
-    }
-    for (Score& v : piece_evals)
-    {
-        variables.push_back({&v.mid, 0});
-        variables.push_back({&v.end, 0});
-    }
-
-    for (int k = 0; k < 4; k++)
-    {
-        std::cout << "===== " << k << " =====" << std::endl;
-        bool progress = false;
-        for (auto& p : variables)
-        {
-            if (find_best_value(p, best_error, 1))
-                progress = true;
-        }
-        if (!progress)
-            break;
-        for (int n = 0; n < 4; n++)
-        {
-            std::cout << "===== " << k << ":" << n << " =====" << std::endl;
-
-            std::sort(
-                variables.begin(), variables.end(),
-                [](const std::pair<int16_t*, double>& lhs, const std::pair<int16_t*, double>& rhs) { return lhs.second > rhs.second; }
-            );
-
-            double cutoff = variables.front().second * std::pow(2., -n - 1.);
-            for (auto& v : variables)
-            {
-                if (v.second < cutoff)
-                    break;
-                find_best_value(v, best_error, 32 / (n + k + 1));
-            }
-        }
-    }
-
-    std::cout << std::fixed << std::setprecision(4) << (10000. * best_error) << std::endl;
-    std::cout << "Score material[6] = {";
-    for (int i = 0; i < 6; i++)
-    {
-        if (i > 0)
-            std::cout << ", ";
-        std::cout << material[i];
-    }
-    std::cout << "};" << std::endl;
-    std::cout << "Score piece_square_table[6][64] =\n";
-    std::cout << "{\n";
-    for (int i = 0; i < 6; i++)
-    {
-        std::cout << "    {";
-        for (int j = 0; j < 64; j++)
-        {
-            if (j % 8 == 0)
-                std::cout << "\n        ";
-            std::cout << piece_square_table[i][j] << ", ";
-        }
-        std::cout << "\n    },\n";
-    }
-    std::cout << "};" << std::endl;
-    int pe_len = sizeof(pawn_evals) / sizeof(pawn_evals[0]);
-    std::cout << "Score pawn_evals[" << pe_len << "] = {";
-    for (int i = 0; i < pe_len; i++)
-    {
-        if (i > 0)
-            std::cout << ", ";
-        std::cout << pawn_evals[i];
-    }
-    std::cout << "};" << std::endl;
-    int ke_len = sizeof(king_evals) / sizeof(king_evals[0]);
-    int ke_len2 = sizeof(king_evals[0]) / sizeof(king_evals[0][0]);
-    std::cout << "Score king_evals[" << ke_len << "][" << ke_len2 << "] =\n";
-    std::cout << "{\n";
-    for (int i = 0; i < ke_len; i++)
-    {
-        std::cout << "    {";
-        for (int j = 0; j < ke_len2; j++)
-        {
-            if (j > 0)
-                std::cout << ", ";
-            std::cout << king_evals[i][j];
-        }
-        std::cout << "},\n";
-    }
-    std::cout << "};" << std::endl;
-    int pce_len = sizeof(piece_evals) / sizeof(piece_evals[0]);
-    std::cout << "Score piece_evals[" << pce_len << "] = {";
-    for (int i = 0; i < pce_len; i++)
-    {
-        if (i > 0)
-            std::cout << ", ";
-        std::cout << piece_evals[i];
-    }
-    std::cout << "};" << std::endl;
-    return 0;
-#endif
-
     std::size_t hash_mb = 1;
     bool debug = false;
     Stack stack[256] = {};
@@ -2433,6 +2219,243 @@ int main()
             break;
         }
     }
+}
+
+#ifdef TUNE
+constexpr double lambda = .5;
+constexpr double sig_r = 0.9948;
+
+inline double sigmoid(double eval)
+{
+    return 1. / (1. + std::pow(sig_r, eval));
+}
+
+struct TuneVariable
+{
+    std::int16_t* p;
+    double improvement;
+};
+
+class Tuner
+{
+public:
+    void tune();
+    void parse_positions();
+    double evaluation_error();
+    bool find_best_value(TuneVariable& variable, double& best_error, int start_delta);
+
+    template<std::size_t N> void add_variables(Score (&arr)[N]);
+    template<std::size_t N, std::size_t M> void add_variables(Score (&arr)[N][M]);
+
+    template<std::size_t N> void print_variables(const char* name, Score (&arr)[N]);
+    template<std::size_t N, std::size_t M> void print_variables(const char* name, Score (&arr)[N][M]);
+
+    std::vector<std::pair<Position, double>> tuning_positions;
+    std::vector<TuneVariable> variables;
+};
+
+void Tuner::parse_positions()
+{
+    int pos_count = 0;
+    std::string line;
+    while (getline(std::cin, line))
+    {
+        ++pos_count;
+        std::istringstream parser{line};
+        position.parse(parser);
+        int score, result;
+        parser.ignore();
+        parser >> score;
+        parser.ignore();
+        parser >> result;
+
+        if (!position.type_bb[PAWN] && (pos_count & 1))
+            continue;
+        if (popcount(position.all_bb()) <= 5)
+            continue;
+        if (position.fullmove_counter <= 8)
+            continue;
+        if (position.castling && (pos_count & 2))
+            continue;
+        tuning_positions.push_back({position, (1. - lambda) * result * 0.5 + lambda * sigmoid(score)});
+    }
+}
+
+double Tuner::evaluation_error()
+{
+    double error_sum = 0.;
+    for (auto& pos : tuning_positions)
+    {
+        position.reset();
+        position.next = pos.first.next;
+        position.halfmove_clock = pos.first.halfmove_clock;
+
+        BitBoard occ = pos.first.all_bb();
+        while (occ)
+        {
+            Square sq = pop(occ);
+            position.set(sq, pos.first.squares[sq]);
+        }
+
+        double err = pos.second - sigmoid(evaluate());
+        error_sum += err * err;
+    }
+    return error_sum / tuning_positions.size();
+}
+
+bool Tuner::find_best_value(TuneVariable& variable, double& best_error, int start_delta)
+{
+    double start_error = best_error;
+    for (int delta = start_delta; delta > 0; delta /= 2)
+    {
+        for (int sd : {-delta, delta})
+        {
+            int prev_value = *variable.p;
+            *variable.p += sd;
+            double error = evaluation_error();
+            if (error >= best_error)
+                *variable.p = prev_value;
+            else
+            {
+                best_error = error;
+                break;
+            }
+        }
+    }
+    variable.improvement = start_error - best_error;
+    std::cout << std::fixed << std::setprecision(4) << (10000. * best_error) << std::endl;
+    return best_error < start_error;
+}
+
+template<std::size_t N> void Tuner::add_variables(Score (&arr)[N])
+{
+    for (Score& v : arr)
+    {
+        variables.push_back({&v.mid, 0});
+        variables.push_back({&v.end, 0});
+    }
+}
+
+template<std::size_t N, std::size_t M> void Tuner::add_variables(Score (&arr)[N][M])
+{
+    for (auto& row : arr)
+        add_variables(row);
+}
+
+template<std::size_t N> void Tuner::print_variables(const char* name, Score (&arr)[N])
+{
+    std::cout << "Score " << name << "[" << N << "] = {";
+    for (int i = 0; i < 6; i++)
+    {
+        if (i > 0)
+            std::cout << ", ";
+        std::cout << arr[i];
+    }
+    std::cout << "};" << std::endl;
+}
+
+template<std::size_t N, std::size_t M> void Tuner::print_variables(const char* name, Score (&arr)[N][M])
+{
+    std::cout << "Score " << name << "[" << N << "][" << M << "] =\n";
+    std::cout << "{\n";
+
+    for (std::size_t i = 0; i < N; i++)
+    {
+        if constexpr (M > 8)
+        {
+            std::cout << "    {";
+            for (std::size_t j = 0; j < M; j++)
+            {
+                if (j % 8 == 0)
+                    std::cout << "\n        ";
+                std::cout << arr[i][j] << ", ";
+            }
+            std::cout << "\n    },\n";
+        }
+        else
+        {
+            std::cout << "    {";
+            for (std::size_t j = 0; j < M; j++)
+            {
+                if (j > 0)
+                    std::cout << ", ";
+                std::cout << arr[i][j];
+            }
+            std::cout << "},\n";
+        }
+    }
+
+    std::cout << "};" << std::endl;
+}
+
+void Tuner::tune()
+{
+    init_bitboards();
+    parse_positions();
+
+    double best_error = evaluation_error();
+    std::cout << std::fixed << std::setprecision(4) << (10000. * best_error) << std::endl;
+
+    variables.push_back({&material[0].end, 0});
+    for (int i = 1; i < 5; i++)
+    {
+        variables.push_back({&material[i].mid, 0});
+        variables.push_back({&material[i].end, 0});
+    }
+    add_variables(piece_square_table);
+    add_variables(pawn_evals);
+    add_variables(king_evals);
+    add_variables(piece_evals);
+
+    for (int k = 0; k < 4; k++)
+    {
+        std::cout << "===== " << k << " =====" << std::endl;
+        bool progress = false;
+        for (auto& p : variables)
+        {
+            if (find_best_value(p, best_error, 1))
+                progress = true;
+        }
+        if (!progress)
+            break;
+        for (int n = 0; n < 4; n++)
+        {
+            std::cout << "===== " << k << ":" << n << " =====" << std::endl;
+
+            std::sort(
+                variables.begin(), variables.end(),
+                [](const TuneVariable& lhs, const TuneVariable& rhs) { return lhs.improvement > rhs.improvement; }
+            );
+
+            double cutoff = variables.front().improvement * std::pow(2., -n - 1.);
+            for (auto& v : variables)
+            {
+                if (v.improvement < cutoff)
+                    break;
+                find_best_value(v, best_error, 32 / (n + k + 1));
+            }
+        }
+    }
+
+    std::cout << std::fixed << std::setprecision(4) << (10000. * best_error) << std::endl;
+    print_variables("material", material);
+    print_variables("piece_square_table", piece_square_table);
+    print_variables("pawn_evals", pawn_evals);
+    print_variables("king_evals", king_evals);
+    print_variables("piece_evals", piece_evals);
+}
+#endif
+
+int main()
+{
+    std::ios::sync_with_stdio(false);
+    std::cout << "# seawall " STRINGIFY(SEAWALL_VERSION) << std::endl;
+
+#ifdef TUNE
+    Tuner{}.tune();
+#else
+    uci_main();
+#endif
 
     return 0;
 }

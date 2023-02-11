@@ -984,22 +984,6 @@ void Stack::save_killer(Move move)
     }
 }
 
-bool repetition(const Stack* stack)
-{
-    std::uint64_t current = stack[0].key;
-    int count = 0;
-    for (int i = 4; i < position.halfmove_clock; i += 2)
-    {
-        if (stack[-i].key == current)
-        {
-            ++count;
-            if (count >= 2)
-                return true;
-        }
-    }
-    return false;
-}
-
 struct MoveHistory
 {
     std::int16_t value;
@@ -1628,6 +1612,7 @@ struct Search
     bool check_stop_command();
     bool check_time(int changes, int improving);
     void set_time_mask(std::clock_t remaining);
+    bool repetition(int ply) const;
 
     int qsearch(int ply, int depth, int alpha, int beta);
     std::pair<int, Move> search(bool pv, int ply, int depth, int alpha, int beta, Move skip_move = NULL_MOVE);
@@ -1735,6 +1720,22 @@ void Search::set_time_mask(std::clock_t remaining)
         time_mask = 0x3fff;
     else
         time_mask = 0x7fff;
+}
+
+bool Search::repetition(int ply) const
+{
+    std::uint64_t current = stack[ply].key;
+    int count = 0;
+    for (int i = 4; i < position.halfmove_clock; i += 2)
+    {
+        if (stack[ply - i].key == current)
+        {
+            ++count;
+            if (count >= 1 + (i >= ply))
+                return true;
+        }
+    }
+    return false;
 }
 
 int Search::qsearch(int ply, int depth, int alpha, int beta)
@@ -1953,7 +1954,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
             gen.moves[gen.index - 1].move = NULL_MOVE;
             --move_count;
         }
-        else if (repetition(&stack[ply + 1]))
+        else if (repetition(ply + 1))
         {
             v = 0;
         }

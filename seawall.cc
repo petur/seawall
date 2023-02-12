@@ -235,7 +235,7 @@ std::ostream& operator<<(std::ostream& out, Square sq)
 enum BitBoard : std::uint64_t
 {
     EMPTY = 0, FILE_A = 0x0101010101010101ULL, FILE_B = FILE_A << 1, FILE_G = FILE_A << 6, FILE_H = FILE_A << 7,
-    RANK_1 = 0x00000000000000ffULL, RANK_8 = RANK_1 << 56, ALL = ~0ULL
+    RANK_1 = 0x00000000000000ffULL, RANK_8 = RANK_1 << 56, QUEEN_SIDE = 0x0f0f0f0f0f0f0f0f, KING_SIDE = ~QUEEN_SIDE, ALL = ~0ULL
 };
 
 inline BitBoard bb(Square s) { return static_cast<BitBoard>(1ULL << s); }
@@ -1379,7 +1379,7 @@ Score king_evals[64][4] =
 #ifndef TUNE
 constexpr
 #endif
-Score piece_evals[7] = {{49, 70}, {37, 6}, {15, 0}, {12, 0}, {38, 37}, {6, 3}, {2, 26}};
+Score piece_evals[8] = {{49, 70}, {37, 6}, {15, 0}, {12, 0}, {38, 37}, {6, 3}, {2, 26}, {15, 0}};
 
 BitBoard knight_moves(BitBoard knights)
 {
@@ -1438,7 +1438,7 @@ Score evaluate_pieces()
         BitBoard opp_pawns = position.type_bb[PAWN] & position.color_bb[~C];
         BitBoard opp_attack = shift_signed<-FWD - 1>(opp_pawns & ~FILE_A) | shift_signed<-FWD + 1>(opp_pawns & ~FILE_H);
 
-        BitBoard knights = position.color_bb[C] & position.type_bb[KNIGHT];
+        BitBoard knights = position.type_bb[KNIGHT] & position.color_bb[C];
         BitBoard km = knight_moves(knights);
 
         r -= piece_evals[3] * popcount(km & opp_attack & ~(position.color_bb[~C] & ~position.type_bb[PAWN]));
@@ -1447,6 +1447,13 @@ Score evaluate_pieces()
 
         constexpr BitBoard OUTPOST_RANKS = static_cast<BitBoard>(C == WHITE ? 0x00ffffff00000000ULL : 0x00000000ffffff00ULL);
         r += piece_evals[6] * popcount((knights | (km & ~position.color_bb[C])) & own_attack & ~opp_attack & OUTPOST_RANKS);
+    }
+
+    if (position.type_bb[BISHOP])
+    {
+        BitBoard bishops = position.type_bb[BISHOP] & position.color_bb[C];
+        BitBoard bblock = shift_signed<FWD - 1>(bishops & KING_SIDE) | shift_signed<FWD + 1>(bishops & QUEEN_SIDE);
+        r -= piece_evals[7] * popcount(bblock & own_pawns);
     }
 
     return r;

@@ -1472,7 +1472,7 @@ int evaluate()
     }
     eval += evaluate_pieces<WHITE>() - evaluate_pieces<BLACK>();
     eval += position.piece_square_values[WHITE] - position.piece_square_values[BLACK];
-    Score result = Score{18, 9} + (position.next == WHITE ? eval : -eval);
+    Score result = Score{20, 10} + (position.next == WHITE ? eval : -eval);
 
     int pieces = popcount(position.all_bb()) + popcount(position.all_bb() & ~position.type_bb[PAWN]) - 2;
     int v = (pieces * result.mid + (48 - pieces) * result.end) / 48;
@@ -1781,12 +1781,12 @@ int Search::qsearch(int ply, int depth, int alpha, int beta)
         if (is_stopped())
             return alpha;
 
-        if (!checkers && !(type(mv) & PROMOTION) && pat + material[type(position.squares[to(mv)])].mid < alpha - 45)
+        if (!checkers && !(type(mv) & PROMOTION) && pat + material[type(position.squares[to(mv)])].mid < alpha - 69)
             continue;
 
         if (!checkers && !(type(mv) & PROMOTION) && mv != best && depth < -1 &&
                 (pawn_attack[position.next][to(mv)] & position.type_bb[PAWN] & position.color_bb[~position.next]) &&
-                material[type(position.squares[from(mv)])].mid > material[type(position.squares[to(mv)])].mid + 160)
+                material[type(position.squares[from(mv)])].mid > material[type(position.squares[to(mv)])].mid + 146)
             continue;
 
         ++nodes;
@@ -1855,7 +1855,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     if (he && ((hv > eval && (he->flags & LOWER)) || (hv < eval && (he->flags & UPPER))))
         eval = hv;
 
-    if (!pv && !checkers && depth <= 3 && eval > beta + 213 * depth - 143)
+    if (!pv && !checkers && depth <= 3 && eval > beta + 199 * depth - 162)
         return {beta, NULL_MOVE};
 
     if (ply >= sel_depth)
@@ -1867,14 +1867,14 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
             ply > 1 &&
             stack[ply].prev_move != NULL_MOVE &&
             depth >= 4 &&
-            eval > beta + 57 &&
+            eval > beta + 65 &&
             !checkers &&
             alpha > -SCORE_WIN &&
             popcount(position.color_bb[position.next] & ~position.type_bb[PAWN]) > 1)
     {
         Memo memo = do_move(ply, NULL_MOVE);
 
-        int v = -search(false, ply + 1, depth - 2 - (eval - beta) / 197, -beta, -beta + 1).first;
+        int v = -search(false, ply + 1, depth - 2 - (eval - beta) / 216, -beta, -beta + 1).first;
         undo_move(NULL_MOVE, memo);
         if (v >= beta)
         {
@@ -1904,9 +1904,9 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
             continue;
         }
         bool checks = is_check(mv, opp_king_sq);
-        if (!checkers && !checks && move_count && depth <= 5 && eval < alpha - (depth * 223 - 141) && !(type(mv) & (CAPTURE | PROMOTION)))
+        if (!checkers && !checks && move_count && depth <= 5 && eval < alpha - (depth * 213 - 166) && !(type(mv) & (CAPTURE | PROMOTION)))
             continue;
-        if (!checkers && !checks && depth <= 7 && alpha > -SCORE_WIN && eval < alpha - 32 - 15 * depth &&
+        if (!checkers && !checks && depth <= 7 && alpha > -SCORE_WIN && eval < alpha - 33 - 17 * depth &&
                 !(type(mv) & (CAPTURE | PROMOTION)) && mv != prev_best && mv != stack[ply].killer_moves[0] && mv != stack[ply].killer_moves[1] &&
                 popcount(position.color_bb[~position.next] & ~position.type_bb[PAWN]) > 1)
         {
@@ -1919,7 +1919,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         if (checkers)
             extension++;
         else if (depth <= 2 && ply < 2 * root_depth && (type(mv) & CAPTURE) && (type(stack[ply].prev_move) & CAPTURE) &&
-                to(mv) == to(stack[ply].prev_move) && eval + material[type(position.squares[to(mv)])].mid > alpha - 27 && eval < beta + 26)
+                to(mv) == to(stack[ply].prev_move) && eval + material[type(position.squares[to(mv)])].mid > alpha - 27 && eval < beta + 29)
             extension++;
         else if (!(type(mv) & CAPTURE) && type(position.squares[from(mv)]) == PAWN && ply < 2 * root_depth &&
                 (bb(to(mv)) & (position.next == WHITE ? 0x00ffffff00000000ULL : 0x00000000ffffff00ULL)) &&

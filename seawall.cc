@@ -1380,7 +1380,7 @@ Score king_evals[64][4] =
 #ifndef TUNE
 constexpr
 #endif
-Score piece_evals[8] = {{47, 78}, {33, 4}, {19, 27}, {13, -1}, {39, 39}, {7, 1}, {3, 21}, {10, 47}};
+Score piece_evals[9] = {{47, 78}, {33, 4}, {19, 27}, {13, -1}, {39, 39}, {7, 1}, {3, 21}, {10, 47}, {10, 10}};
 
 BitBoard knight_moves(BitBoard knights)
 {
@@ -1424,6 +1424,9 @@ Score evaluate_pieces()
     BitBoard own_pawns = position.type_bb[PAWN] & position.color_bb[C];
     BitBoard own_attack = shift_signed<FWD - 1>(own_pawns & ~FILE_A) | shift_signed<FWD + 1>(own_pawns & ~FILE_H);
 
+    BitBoard opp_pawns = position.type_bb[PAWN] & position.color_bb[~C];
+    BitBoard opp_attack = shift_signed<-FWD - 1>(opp_pawns & ~FILE_A) | shift_signed<-FWD + 1>(opp_pawns & ~FILE_H);
+
     r += piece_evals[0] * popcount(own_attack & position.color_bb[~C] & ~position.type_bb[PAWN]);
 
     if (position.type_bb[ROOK] && position.type_bb[PAWN])
@@ -1436,9 +1439,6 @@ Score evaluate_pieces()
 
     if (position.type_bb[KNIGHT])
     {
-        BitBoard opp_pawns = position.type_bb[PAWN] & position.color_bb[~C];
-        BitBoard opp_attack = shift_signed<-FWD - 1>(opp_pawns & ~FILE_A) | shift_signed<-FWD + 1>(opp_pawns & ~FILE_H);
-
         BitBoard knights = position.type_bb[KNIGHT] & position.color_bb[C];
         BitBoard km = knight_moves(knights);
 
@@ -1455,6 +1455,8 @@ Score evaluate_pieces()
         BitBoard bishops = position.type_bb[BISHOP] & position.color_bb[C];
         BitBoard bblock = shift_signed<FWD - 1>(bishops & KING_SIDE) | shift_signed<FWD + 1>(bishops & QUEEN_SIDE);
         r -= piece_evals[7] * popcount(bblock & own_pawns);
+        BitBoard bblock2 = shift_signed<2 * FWD - 2>(bishops & KING_SIDE) | shift_signed<2 * FWD + 2>(bishops & QUEEN_SIDE);
+        r -= piece_evals[8] * popcount(bblock2 & (own_pawns | (opp_pawns & opp_attack)));
     }
 
     return r;

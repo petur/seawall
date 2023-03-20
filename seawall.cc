@@ -1440,10 +1440,10 @@ Score king_evals[64][4] =
 #ifndef TUNE
 constexpr
 #endif
-Score piece_evals[10] =
+Score piece_evals[11] =
 {
     {53, 77}, {34, -13}, {20, 24}, {13, 2}, {39, 36}, {6, 5}, {2, 22}, {11, 51},
-    {12, 33}, {38, 16},
+    {12, 33}, {20, 15}, {38, 16},
 };
 
 template<Color C>
@@ -1510,6 +1510,7 @@ Score evaluate_pieces(const Mobility& mobility)
         r -= piece_evals[7] * popcount(bblock & own_pawns);
         BitBoard bblock2 = shift_signed<2 * FWD - 2>(bishops & KING_SIDE) | shift_signed<2 * FWD + 2>(bishops & QUEEN_SIDE);
         r -= piece_evals[8] * popcount(bblock2 & (own_pawns | (opp_pawns & opp_attack)));
+        r += piece_evals[9] * popcount(mobility.attacks[C][BISHOP] & position.color_bb[~C] & (position.type_bb[ROOK] | position.type_bb[QUEEN]));
     }
 
     BitBoard guarded = own_attack | king_attack[king_sq] |
@@ -1519,7 +1520,7 @@ Score evaluate_pieces(const Mobility& mobility)
         (bishop_attack(king_sq, position.all_bb()) & (mobility.attacks[~C][BISHOP] | mobility.attacks[~C][QUEEN])) |
         (rook_attack(king_sq, position.all_bb()) & (mobility.attacks[~C][ROOK] | mobility.attacks[~C][QUEEN]))
     );
-    r -= piece_evals[9] * popcount(safe_checks);
+    r -= piece_evals[10] * popcount(safe_checks);
 
     return r;
 }

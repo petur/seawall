@@ -235,7 +235,8 @@ std::ostream& operator<<(std::ostream& out, Square sq)
 enum BitBoard : std::uint64_t
 {
     EMPTY = 0, FILE_A = 0x0101010101010101ULL, FILE_B = FILE_A << 1, FILE_G = FILE_A << 6, FILE_H = FILE_A << 7,
-    RANK_1 = 0x00000000000000ffULL, RANK_8 = RANK_1 << 56, QUEEN_SIDE = 0x0f0f0f0f0f0f0f0f, KING_SIDE = ~QUEEN_SIDE, ALL = ~0ULL
+    RANK_1 = 0x00000000000000ffULL, RANK_8 = RANK_1 << 56, QUEEN_SIDE = 0x0f0f0f0f0f0f0f0f, KING_SIDE = ~QUEEN_SIDE,
+    LIGHT_SQUARES = 0x55aa55aa55aa55aaULL, DARK_SQUARES = ~LIGHT_SQUARES, ALL = ~0ULL
 };
 
 inline BitBoard bb(Square s) { return static_cast<BitBoard>(1ULL << s); }
@@ -372,7 +373,7 @@ std::ostream& operator<<(std::ostream& out, Score s)
 #ifndef TUNE
 constexpr
 #endif
-Score material[6] = {{100, 151}, {357, 451}, {392, 516}, {414, 889}, {1031, 1659}, {2000, 2000}};
+Score material[6] = {{100, 151}, {357, 451}, {381, 513}, {414, 889}, {1031, 1659}, {2000, 2000}};
 
 alignas(64)
 #ifndef TUNE
@@ -1440,39 +1441,39 @@ Score king_evals[64][4] =
 #ifndef TUNE
 constexpr
 #endif
-Score piece_evals[8][11] =
+Score piece_evals[8][12] =
 {
     {
         {55, 81}, {34, -11}, {19, 24}, {12, 3}, {35, 50}, {6, 10}, {2, 22}, {10, 55},
-        {12, 39}, {43, 49}, {54, 12},
+        {12, 39}, {43, 49}, {-1, 49}, {54, 12},
     },
     {
         {53, 61}, {27, -7}, {18, 26}, {14, 0}, {36, 32}, {5, 4}, {2, 21}, {11, 39},
-        {10, 32}, {29, 44}, {29, 30},
+        {10, 32}, {29, 44}, {2, 48}, {29, 30},
     },
     {
         {58, 68}, {42, -13}, {20, 25}, {15, -1}, {51, 33}, {4, 2}, {16, 14}, {13, 35},
-        {15, 22}, {33, 38}, {70, 0},
+        {15, 22}, {33, 38}, {-1, 60}, {70, 0},
     },
     {
         {45, 68}, {39, -18}, {21, 26}, {18, -4}, {38, 28}, {7, 0}, {20, 13}, {19, 30},
-        {14, 21}, {21, 24}, {73, 2},
+        {14, 21}, {21, 24}, {7, 46}, {73, 2},
     },
     {
         {52, 107}, {47, -25}, {24, 24}, {25, 1}, {37, -4}, {7, -4}, {36, -3}, {26, 47},
-        {5, 15}, {29, 14}, {55, -1},
+        {5, 15}, {29, 14}, {-30, 47}, {55, -1},
     },
     {
         {59, 117}, {54, -30}, {26, 18}, {12, 2}, {41, 18}, {9, 2}, {46, -9}, {13, 47},
-        {2, 27}, {32, 17}, {56, 0},
+        {2, 27}, {32, 17}, {35, 27}, {56, 0},
     },
     {
         {58, 122}, {57, -42}, {18, 16}, {6, 15}, {26, 14}, {-10, -7}, {20, 5}, {9, 49},
-        {6, 33}, {34, 19}, {51, -5},
+        {6, 33}, {34, 19}, {11, 39}, {51, -5},
     },
     {
         {53, 113}, {56, -45}, {17, 18}, {14, 5}, {31, 12}, {-1, 6}, {11, 2}, {10, 62},
-        {2, 37}, {36, 14}, {48, -3},
+        {2, 37}, {36, 14}, {6, 11}, {48, -3},
     },
 };
 
@@ -1542,6 +1543,9 @@ Score evaluate_pieces(const Mobility& mobility)
         BitBoard bblock2 = shift_signed<2 * FWD - 2>(bishops & KING_SIDE) | shift_signed<2 * FWD + 2>(bishops & QUEEN_SIDE);
         r -= pe[8] * popcount(bblock2 & (own_pawns | (opp_pawns & opp_attack)));
         r += pe[9] * popcount(mobility.attacks[C][BISHOP] & position.color_bb[~C] & (position.type_bb[ROOK] | position.type_bb[QUEEN]));
+
+        if ((bishops & LIGHT_SQUARES) && (bishops & DARK_SQUARES))
+            r += pe[10];
     }
 
     BitBoard guarded = own_attack | king_attack[king_sq] |
@@ -1551,7 +1555,7 @@ Score evaluate_pieces(const Mobility& mobility)
         (bishop_attack(king_sq, position.all_bb()) & (mobility.attacks[~C][BISHOP] | mobility.attacks[~C][QUEEN])) |
         (rook_attack(king_sq, position.all_bb()) & (mobility.attacks[~C][ROOK] | mobility.attacks[~C][QUEEN]))
     );
-    r -= pe[10] * popcount(safe_checks);
+    r -= pe[11] * popcount(safe_checks);
 
     return r;
 }

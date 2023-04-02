@@ -1158,7 +1158,7 @@ template<PieceType Type> void MoveGen::generate_pieces(MoveGenType gen, BitBoard
 
 std::int16_t MoveGen::rank_capture(Move mv) const
 {
-    return static_cast<std::int16_t>(8192 * (type(position.squares[to(mv)]) - 3) +
+    return static_cast<std::int16_t>(7742 * (type(position.squares[to(mv)]) - 3) +
             capture_history[6 * type(position.squares[to(mv)]) + type(position.squares[from(mv)])][to(mv)].value);
 }
 
@@ -1168,7 +1168,7 @@ std::int16_t MoveGen::rank_quiet(Move mv) const
     if (mv == stack.killer_moves[0] || mv == stack.killer_moves[1])
         rank += 16354;
     if (mv == counter_move)
-        rank += 4096;
+        rank += 4394;
     return rank;
 }
 
@@ -1574,7 +1574,7 @@ int evaluate()
     eval += evaluate_mobility<WHITE>(mobility) - evaluate_mobility<BLACK>(mobility);
     eval += evaluate_pieces<WHITE>(mobility) - evaluate_pieces<BLACK>(mobility);
     eval += position.piece_square_values[WHITE] - position.piece_square_values[BLACK];
-    Score result = Score{20, 10} + (position.next == WHITE ? eval : -eval);
+    Score result = Score{21, 10} + (position.next == WHITE ? eval : -eval);
 
     int pieces = popcount(position.all_bb()) + popcount(position.all_bb() & ~position.type_bb[PAWN]) - 2;
     int v = (pieces * result.mid + (48 - pieces) * result.end) / 48;
@@ -1802,8 +1802,8 @@ bool Search::check_time(int changes, int improving)
             20 * total_time / ((4 + ((changes <= 1) * std::max(0, improving - 1))) * std::min(32 + pieces, 5 * moves_to_go)) + 4 * increment);
         std::clock_t target_time = std::min(
             max_time,
-            36 * total_time / ((4 + ((changes <= 1) * std::max(0, improving - 1))) * std::min(20 * std::max(16, pieces), 13 * moves_to_go))
-                    + 16 * increment / (32 + pieces));
+            36 * total_time / ((4 + ((changes <= 1) * std::max(0, improving - 1))) * std::min(17 * std::max(16, pieces), 13 * moves_to_go))
+                    + 22 * increment / (26 + pieces));
 
         std::clock_t elapsed = std::clock() - start;
         if (elapsed > target_time)
@@ -1888,7 +1888,7 @@ int Search::qsearch(int ply, int depth, int alpha, int beta)
 
         if (!checkers && !(type(mv) & PROMOTION) && mv != best && depth < -1 &&
                 (pawn_attack[position.next][to(mv)] & position.type_bb[PAWN] & position.color_bb[~position.next]) &&
-                material[type(position.squares[from(mv)])].mid > material[type(position.squares[to(mv)])].mid + 146)
+                material[type(position.squares[from(mv)])].mid > material[type(position.squares[to(mv)])].mid + 137)
             continue;
 
         ++nodes;
@@ -1957,7 +1957,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     if (he && ((hv > eval && (he->flags & LOWER)) || (hv < eval && (he->flags & UPPER))))
         eval = hv;
 
-    if (!pv && !checkers && depth <= 3 && eval > beta + 199 * depth - 162)
+    if (!pv && !checkers && depth <= 3 && eval > beta + 194 * depth - 155)
         return {beta, NULL_MOVE};
 
     if (ply >= sel_depth)
@@ -1969,14 +1969,14 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
             ply > 1 &&
             stack[ply].prev_move != NULL_MOVE &&
             depth >= 4 &&
-            eval > beta + 65 &&
+            eval > beta + 68 &&
             !checkers &&
             alpha > -SCORE_WIN &&
             popcount(position.color_bb[position.next] & ~position.type_bb[PAWN]) > 1)
     {
         Memo memo = do_move(ply, NULL_MOVE);
 
-        int v = -search(false, ply + 1, depth - 2 - (eval - beta) / 216, -beta, -beta + 1).first;
+        int v = -search(false, ply + 1, depth - 2 - (eval - beta) / 184, -beta, -beta + 1).first;
         undo_move(NULL_MOVE, memo);
         if (v >= beta)
         {
@@ -2006,14 +2006,14 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
             continue;
         }
         bool checks = is_check(mv, opp_king_sq);
-        if (!checkers && !checks && move_count && depth <= 5 && eval < alpha - (depth * 213 - 166) && !(type(mv) & (CAPTURE | PROMOTION)))
+        if (!checkers && !checks && move_count && depth <= 5 && eval < alpha - (depth * 204 - 150) && !(type(mv) & (CAPTURE | PROMOTION)))
             continue;
-        if (!checkers && !checks && depth <= 7 && alpha > -SCORE_WIN && eval < alpha - 33 - 17 * depth &&
+        if (!checkers && !checks && depth <= 7 && alpha > -SCORE_WIN && eval < alpha - 24 - 17 * depth &&
                 !(type(mv) & (CAPTURE | PROMOTION)) && mv != prev_best && mv != stack[ply].killer_moves[0] && mv != stack[ply].killer_moves[1] &&
                 popcount(position.color_bb[~position.next] & ~position.type_bb[PAWN]) > 1)
         {
             ++mcp;
-            if (mcp > 3 * (depth - 1) + 1)
+            if (mcp > 2 * (depth - 1) + 3)
                 break;
         }
 
@@ -2021,7 +2021,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         if (checkers)
             extension++;
         else if (depth <= 2 && ply < 2 * root_depth && (type(mv) & CAPTURE) && (type(stack[ply].prev_move) & CAPTURE) &&
-                to(mv) == to(stack[ply].prev_move) && eval + material[type(position.squares[to(mv)])].mid > alpha - 27 && eval < beta + 29)
+                to(mv) == to(stack[ply].prev_move) && eval + material[type(position.squares[to(mv)])].mid > alpha - 28 && eval < beta + 20)
             extension++;
         else if (!(type(mv) & CAPTURE) && type(position.squares[from(mv)]) == PAWN && ply < 2 * root_depth &&
                 (bb(to(mv)) & (position.next == WHITE ? 0x00ffffff00000000ULL : 0x00000000ffffff00ULL)) &&
@@ -2048,7 +2048,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
             reduction = move_count - 2;
             if (he && !(he->flags & LOWER))
                 reduction += 4;
-            reduction -= history[position.next][mv & FROM_TO_MASK].value / 2048;
+            reduction -= history[position.next][mv & FROM_TO_MASK].value / 1948;
             reduction = std::clamp(reduction / 4, 0, depth / 3);
         }
 
@@ -2129,7 +2129,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         }
         if (depth > 1)
         {
-            int inc = 430 + 40 * depth;
+            int inc = 462 + 41 * depth;
             MoveHistory* hist = history[position.next];
             for (int i = gen.index - 1; i >= 0; --i)
             {

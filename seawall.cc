@@ -1325,13 +1325,20 @@ Score mobility_evals[66] =
 struct Mobility
 {
     BitBoard attacks[2][6];
+    BitBoard attacks2[2];
 };
 
 template<Color C>
 Score evaluate_mobility(Mobility& mobility)
 {
+    constexpr int FWD = C == WHITE ? 8 : -8;
+
     BitBoard blockers = position.all_bb();
     BitBoard own = position.color_bb[C];
+    BitBoard own_pawns = position.type_bb[PAWN] & own;
+    mobility.attacks[C][PAWN] = shift_signed<FWD - 1>(own_pawns & ~FILE_A) | shift_signed<FWD + 1>(own_pawns & ~FILE_H);
+    BitBoard all_attacks = mobility.attacks[C][PAWN];
+
     Score r{0, 0};
 
     BitBoard knights = position.type_bb[KNIGHT] & own;
@@ -1340,6 +1347,8 @@ Score evaluate_mobility(Mobility& mobility)
         BitBoard m = knight_attack[pop(knights)];
         r += mobility_evals[popcount(m & ~own)];
         mobility.attacks[C][KNIGHT] |= m;
+        mobility.attacks2[C] |= (m & all_attacks);
+        all_attacks |= m;
     }
     BitBoard bishops = position.type_bb[BISHOP] & own;
     while (bishops)
@@ -1347,6 +1356,8 @@ Score evaluate_mobility(Mobility& mobility)
         BitBoard m = bishop_attack(pop(bishops), blockers & ~(position.type_bb[QUEEN] & own));
         r += mobility_evals[9 + popcount(m & ~own)];
         mobility.attacks[C][BISHOP] |= m;
+        mobility.attacks2[C] |= (m & all_attacks);
+        all_attacks |= m;
     }
     BitBoard rooks = position.type_bb[ROOK] & own;
     while (rooks)
@@ -1354,6 +1365,8 @@ Score evaluate_mobility(Mobility& mobility)
         BitBoard m = rook_attack(pop(rooks), blockers & ~((position.type_bb[ROOK] | position.type_bb[QUEEN]) & own));
         r += mobility_evals[23 + popcount(m & ~own)];
         mobility.attacks[C][ROOK] |= m;
+        mobility.attacks2[C] |= (m & all_attacks);
+        all_attacks |= m;
     }
     BitBoard queens = position.type_bb[QUEEN] & own;
     while (queens)
@@ -1361,6 +1374,8 @@ Score evaluate_mobility(Mobility& mobility)
         BitBoard m = queen_attack(pop(queens), blockers);
         r += mobility_evals[38 + popcount(m & ~own)];
         mobility.attacks[C][QUEEN] |= m;
+        mobility.attacks2[C] |= (m & all_attacks);
+        all_attacks |= m;
     }
 
     return r;
@@ -1441,39 +1456,39 @@ Score king_evals[64][4] =
 #ifndef TUNE
 constexpr
 #endif
-Score piece_evals[8][12] =
+Score piece_evals[8][13] =
 {
     {
         {59, 79}, {33, -11}, {19, 24}, {12, 2}, {36, 48}, {7, 10}, {2, 22}, {10, 55},
-        {12, 39}, {46, 49}, {-1, 49}, {61, 10},
+        {12, 39}, {46, 49}, {-1, 49}, {61, 10}, {78, 0},
     },
     {
         {55, 61}, {27, -7}, {18, 26}, {14, 0}, {36, 32}, {5, 4}, {3, 21}, {13, 35},
-        {12, 33}, {34, 42}, {3, 55}, {32, 32},
+        {12, 33}, {34, 42}, {3, 55}, {32, 32}, {74, -13},
     },
     {
         {57, 67}, {44, -13}, {20, 29}, {14, -2}, {49, 31}, {4, 1}, {18, 15}, {20, 35},
-        {18, 20}, {42, 40}, {0, 61}, {78, -3},
+        {18, 20}, {42, 40}, {0, 61}, {78, -3}, {29, 3},
     },
     {
         {38, 68}, {40, -18}, {21, 28}, {17, -4}, {36, 18}, {7, 0}, {20, 13}, {12, 30},
-        {18, 21}, {20, 25}, {10, 48}, {79, 1},
+        {18, 21}, {20, 25}, {10, 48}, {79, 1}, {21, 3},
     },
     {
         {50, 107}, {47, -27}, {24, 21}, {25, 1}, {39, -2}, {7, -5}, {40, -4}, {23, 43},
-        {4, 14}, {30, 12}, {-31, 50}, {64, -1},
+        {4, 14}, {30, 12}, {-31, 50}, {64, -1}, {19, 11},
     },
     {
         {56, 114}, {54, -30}, {26, 18}, {12, 0}, {42, 18}, {9, 3}, {45, -12}, {-2, 44},
-        {2, 28}, {31, 18}, {42, 28}, {58, 0},
+        {2, 28}, {31, 18}, {42, 28}, {58, 0}, {2, 11},
     },
     {
         {60, 124}, {55, -43}, {17, 15}, {3, 15}, {28, 15}, {-8, 4}, {17, -9}, {9, 47},
-        {8, 36}, {32, 21}, {8, 38}, {50, -4},
+        {8, 36}, {32, 21}, {8, 38}, {50, -4}, {4, 22},
     },
     {
         {50, 112}, {52, -46}, {10, 17}, {14, 5}, {31, 14}, {-1, 15}, {9, -12}, {9, 61},
-        {3, 37}, {37, 12}, {8, 14}, {49, -1},
+        {3, 37}, {37, 12}, {8, 14}, {49, -1}, {3, 28},
     },
 };
 
@@ -1506,10 +1521,10 @@ Score evaluate_pieces(const Mobility& mobility)
     constexpr int FWD = C == WHITE ? 8 : -8;
 
     BitBoard own_pawns = position.type_bb[PAWN] & position.color_bb[C];
-    BitBoard own_attack = shift_signed<FWD - 1>(own_pawns & ~FILE_A) | shift_signed<FWD + 1>(own_pawns & ~FILE_H);
+    BitBoard own_attack = mobility.attacks[C][PAWN];
 
     BitBoard opp_pawns = position.type_bb[PAWN] & position.color_bb[~C];
-    BitBoard opp_attack = shift_signed<-FWD - 1>(opp_pawns & ~FILE_A) | shift_signed<-FWD + 1>(opp_pawns & ~FILE_H);
+    BitBoard opp_attack = mobility.attacks[~C][PAWN];
 
     const Score* pe = piece_evals[eval_offset];
     r += pe[0] * popcount(own_attack & position.color_bb[~C] & ~position.type_bb[PAWN]);
@@ -1548,14 +1563,15 @@ Score evaluate_pieces(const Mobility& mobility)
             r += pe[10];
     }
 
-    BitBoard guarded = own_attack | king_attack[king_sq] |
+    BitBoard guarded = own_attack |
         mobility.attacks[C][KNIGHT] | mobility.attacks[C][BISHOP] | mobility.attacks[C][ROOK] | mobility.attacks[C][QUEEN];
-    BitBoard safe_checks = ~guarded & ~position.color_bb[~C] & (
+    BitBoard safe_checks = ~guarded & ~king_attack[king_sq] & ~position.color_bb[~C] & (
         (knight_attack[king_sq] & mobility.attacks[~C][KNIGHT]) |
         (bishop_attack(king_sq, position.all_bb()) & (mobility.attacks[~C][BISHOP] | mobility.attacks[~C][QUEEN])) |
         (rook_attack(king_sq, position.all_bb()) & (mobility.attacks[~C][ROOK] | mobility.attacks[~C][QUEEN]))
     );
     r -= pe[11] * popcount(safe_checks);
+    r -= pe[12] * popcount(king_attack[king_sq] & mobility.attacks2[~C] & ~guarded);
 
     return r;
 }

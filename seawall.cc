@@ -2024,6 +2024,10 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         bool checks = is_check(mv, opp_king_sq);
         if (!checkers && !checks && move_count && depth <= 5 && eval < alpha - (depth * 204 - 150) && !(type(mv) & (CAPTURE | PROMOTION)))
             continue;
+        if (!checkers && !checks && move_count && depth <= 1 && (type(mv) & CAPTURE) && !(type(mv) & PROMOTION) &&
+                eval + material[type(position.squares[to(mv)])].mid < alpha - 69)
+            continue;
+
         if (!checkers && !checks && depth <= 7 && alpha > -SCORE_WIN && eval < alpha - 24 - 17 * depth &&
                 !(type(mv) & (CAPTURE | PROMOTION)) && mv != prev_best && mv != stack[ply].killer_moves[0] && mv != stack[ply].killer_moves[1] &&
                 popcount(position.color_bb[~position.next] & ~position.type_bb[PAWN]) > 1)

@@ -1902,7 +1902,7 @@ int Search::qsearch(int ply, int depth, int alpha, int beta)
         if (!checkers && !(type(mv) & PROMOTION) && pat + material[type(position.squares[to(mv)])].mid < alpha - 69)
             continue;
 
-        if (!checkers && !(type(mv) & PROMOTION) && mv != best && depth < -1 &&
+        if (!checkers && !(type(mv) & PROMOTION) && mv != best &&
                 (pawn_attack[position.next][to(mv)] & position.type_bb[PAWN] & position.color_bb[~position.next]) &&
                 material[type(position.squares[from(mv)])].mid > material[type(position.squares[to(mv)])].mid + 137)
             continue;

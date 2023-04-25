@@ -2027,7 +2027,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         if (!checkers && !checks && move_count && depth <= 1 && (type(mv) & CAPTURE) && !(type(mv) & PROMOTION) &&
                 eval + material[type(position.squares[to(mv)])].mid < alpha - 69)
             continue;
-        if (!checkers && !checks && move_count && depth <= 1 && !(type(mv) & (CAPTURE | PROMOTION)) &&
+        if (!checkers && !checks && move_count && depth <= 1 && !(type(mv) & (CAPTURE | PROMOTION)) && eval < beta + 150 &&
                 (pawn_attack[position.next][to(mv)] & position.type_bb[PAWN] & position.color_bb[~position.next]) &&
                 type(position.squares[from(mv)]) != PAWN)
             continue;

@@ -1992,7 +1992,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     {
         Memo memo = do_move(ply, NULL_MOVE);
 
-        int v = -search(false, ply + 1, depth - 2 - (eval - beta) / 184, -beta, -beta + 1).first;
+        int v = -search(false, ply + 1, depth - (eval - beta + 268 + 25 * depth) / 184, -beta, -beta + 1).first;
         undo_move(NULL_MOVE, memo);
         if (v >= beta)
         {

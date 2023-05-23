@@ -1227,12 +1227,24 @@ Move MoveGen::next()
 #ifndef TUNE
 constexpr
 #endif
-Score pawn_evals[4][8] =
+Score pawn_evals[4][9] =
 {
-    {{22, 29}, {-50, 75}, {1, 16}, {7, 27}, {-8, 47}, {10, 36}, {-1, 60}, {14, -3}},
-    {{20, 18}, {-27, 79}, {9, 6}, {1, 31}, {-6, 28}, {7, 32}, {8, 49}, {5, 13}},
-    {{23, 24}, {-7, 73}, {12, 4}, {22, 17}, {2, 23}, {12, 22}, {12, 45}, {11, 13}},
-    {{22, 29}, {-2, 75}, {11, 8}, {17, 18}, {7, 17}, {13, 18}, {6, 46}, {12, 14}},
+    {
+        {23, 29}, {15, 26}, {-50, 75}, {1, 16}, {7, 27}, {-8, 47}, {10, 36}, {-1, 60},
+        {14, -3},
+    },
+    {
+        {21, 17}, {18, 19}, {-27, 79}, {9, 6}, {1, 31}, {-6, 28}, {7, 32}, {8, 49},
+        {5, 13},
+    },
+    {
+        {23, 23}, {26, 15}, {-7, 73}, {12, 4}, {22, 17}, {2, 23}, {12, 22}, {12, 45},
+        {11, 13},
+    },
+    {
+        {22, 30}, {28, 20}, {-2, 75}, {11, 8}, {17, 18}, {7, 17}, {13, 18}, {6, 46},
+        {12, 14},
+    },
 };
 
 template<Color C>
@@ -1250,19 +1262,21 @@ Score evaluate_pawns()
     BitBoard adjacent = shift_signed<-1>(own_pawns & ~FILE_A) | shift_signed<1>(own_pawns & ~FILE_H);
     constexpr BitBoard NEAR_RANKS = static_cast<BitBoard>(C == WHITE ? 0x00000000ffffff00ULL : 0x00ffffff00000000ULL);
     constexpr BitBoard FAR_RANKS = static_cast<BitBoard>(C == WHITE ? 0x00ffffff00000000ULL : 0x00000000ffffff00ULL);
-    constexpr BitBoard CP_RANKS = static_cast<BitBoard>(C == WHITE ? 0x000000ffffff0000ULL : 0x0000ffffff000000ULL);
+    constexpr BitBoard CP_RANKS1 = static_cast<BitBoard>(C == WHITE ? 0x00000000ffff0000ULL : 0x0000ffff00000000ULL);
+    constexpr BitBoard CP_RANKS2 = static_cast<BitBoard>(C == WHITE ? 0x0000ffff00000000ULL : 0x00000000ffff0000ULL);
     constexpr BitBoard PP_RANKS = static_cast<BitBoard>(C == WHITE ? 0x0000ffffff000000ULL : 0x000000ffffff0000ULL);
     constexpr BitBoard BP_RANKS = static_cast<BitBoard>(C == WHITE ? 0x0000000000ffff00ULL : 0x00ffff0000000000ULL);
 
     const Score* pe = pawn_evals[(popcount(all_pawns) - 1) / 4];
-    return pe[0] * popcount(own_pawns & CP_RANKS & own_attack)
-            + pe[1] * popcount(own_pawns & PP_RANKS & ~smear<-FWD>(opp_pawns | opp_attack))
-            + pe[2] * popcount(own_pawns & NEAR_RANKS & adjacent)
-            + pe[3] * popcount(own_pawns & FAR_RANKS & adjacent)
-            - pe[4] * popcount(own_pawns & shift_signed<FWD>(own_pawns))
-            - pe[5] * popcount(own_pawns & smear<FWD>(shift_signed<FWD>(own_pawns)))
-            + pe[6] * popcount(own_pawns & BP_RANKS & shift_signed<-FWD>(opp_pawns))
-            - pe[7] * popcount(own_pawns & BP_RANKS & shift_signed<-FWD>(opp_attack) & ~adjacent & ~own_attack);
+    return pe[0] * popcount(own_pawns & CP_RANKS1 & own_attack)
+            + pe[1] * popcount(own_pawns & CP_RANKS2 & own_attack)
+            + pe[2] * popcount(own_pawns & PP_RANKS & ~smear<-FWD>(opp_pawns | opp_attack))
+            + pe[3] * popcount(own_pawns & NEAR_RANKS & adjacent)
+            + pe[4] * popcount(own_pawns & FAR_RANKS & adjacent)
+            - pe[5] * popcount(own_pawns & shift_signed<FWD>(own_pawns))
+            - pe[6] * popcount(own_pawns & smear<FWD>(shift_signed<FWD>(own_pawns)))
+            + pe[7] * popcount(own_pawns & BP_RANKS & shift_signed<-FWD>(opp_pawns))
+            - pe[8] * popcount(own_pawns & BP_RANKS & shift_signed<-FWD>(opp_attack) & ~adjacent & ~own_attack);
 }
 
 struct PawnEvalCache

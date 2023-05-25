@@ -1593,7 +1593,7 @@ Score evaluate_pieces(const Mobility& mobility)
 
     BitBoard guarded = own_attack |
         mobility.attacks[C][KNIGHT] | mobility.attacks[C][BISHOP] | mobility.attacks[C][ROOK] | mobility.attacks[C][QUEEN];
-    BitBoard safe_checks = ~guarded & ~king_attack[king_sq] & ~position.color_bb[~C] & (
+    BitBoard safe_checks = ~guarded & (~king_attack[king_sq] | mobility.attacks2[~C]) & ~position.color_bb[~C] & (
         (knight_attack[king_sq] & mobility.attacks[~C][KNIGHT]) |
         (bishop_attack(king_sq, position.all_bb()) & (mobility.attacks[~C][BISHOP] | mobility.attacks[~C][QUEEN])) |
         (rook_attack(king_sq, position.all_bb()) & (mobility.attacks[~C][ROOK] | mobility.attacks[~C][QUEEN]))

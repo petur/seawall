@@ -1484,39 +1484,39 @@ Score king_evals[64][4] =
 #ifndef TUNE
 constexpr
 #endif
-Score piece_evals[8][13] =
+Score piece_evals[8][14] =
 {
     {
-        {57, 82}, {32, -12}, {17, 21}, {12, 2}, {38, 43}, {6, 10}, {3, 18}, {7, 60},
-        {12, 44}, {44, 60}, {5, 70}, {67, 7}, {65, -12},
+        {57, 89}, {37, 81}, {32, -12}, {17, 21}, {12, 2}, {38, 43}, {6, 10}, {3, 18},
+        {7, 60}, {12, 44}, {44, 60}, {5, 70}, {67, 7}, {65, -12},
     },
     {
-        {55, 60}, {23, -9}, {18, 26}, {13, 0}, {34, 36}, {4, 3}, {4, 19}, {11, 37},
-        {11, 37}, {39, 33}, {13, 67}, {36, 32}, {73, -27},
+        {58, 64}, {36, 47}, {23, -9}, {18, 26}, {13, 0}, {34, 36}, {4, 3}, {4, 19},
+        {11, 37}, {11, 37}, {39, 33}, {13, 67}, {36, 32}, {73, -27},
     },
     {
-        {47, 71}, {39, -21}, {23, 33}, {10, -1}, {47, 18}, {7, 2}, {29, 8}, {33, 22},
-        {26, 24}, {40, 28}, {18, 82}, {99, -11}, {55, -16},
+        {57, 70}, {35, 75}, {39, -21}, {23, 33}, {10, -1}, {47, 18}, {7, 2}, {29, 8},
+        {33, 22}, {26, 24}, {40, 28}, {18, 82}, {99, -11}, {55, -16},
     },
     {
-        {28, 71}, {49, -29}, {23, 30}, {17, -5}, {31, 29}, {0, 1}, {25, 4}, {26, 18},
-        {21, 18}, {27, 16}, {13, 69}, {96, -7}, {48, -19},
+        {41, 66}, {26, 59}, {49, -29}, {23, 30}, {17, -5}, {31, 29}, {0, 1}, {25, 4},
+        {26, 18}, {21, 18}, {27, 16}, {13, 69}, {96, -7}, {48, -19},
     },
     {
-        {53, 95}, {56, -35}, {19, 22}, {1, 8}, {30, 22}, {21, -7}, {62, -25}, {9, 29},
-        {0, 28}, {24, 15}, {-7, 74}, {104, -17}, {15, 8},
+        {50, 67}, {52, 94}, {56, -35}, {19, 22}, {1, 8}, {30, 22}, {21, -7}, {62, -25},
+        {9, 29}, {0, 28}, {24, 15}, {-7, 74}, {104, -17}, {15, 8},
     },
     {
-        {39, 92}, {66, -34}, {20, 12}, {-3, 5}, {39, 8}, {5, 3}, {61, -16}, {-5, 38},
-        {-10, 36}, {22, 31}, {60, 42}, {81, -7}, {6, 4},
+        {4, 70}, {66, 144}, {66, -34}, {20, 12}, {-3, 5}, {39, 8}, {5, 3}, {61, -16},
+        {-5, 38}, {-10, 36}, {22, 31}, {60, 42}, {81, -7}, {6, 4},
     },
     {
-        {54, 139}, {80, -48}, {27, 2}, {-15, 29}, {10, -1}, {-19, 2}, {11, -17}, {-6, 31},
-        {3, 39}, {27, 15}, {4, 41}, {72, -12}, {21, 54},
+        {60, 149}, {53, 145}, {80, -48}, {27, 2}, {-15, 29}, {10, -1}, {-19, 2}, {11, -17},
+        {-6, 31}, {3, 39}, {27, 15}, {4, 41}, {72, -12}, {21, 54},
     },
     {
-        {43, 108}, {60, -43}, {7, 14}, {-3, 11}, {45, 21}, {-16, 4}, {30, 6}, {-13, 37},
-        {-14, 51}, {33, 10}, {7, 15}, {53, -3}, {8, 38},
+        {41, 106}, {45, 110}, {60, -43}, {7, 14}, {-3, 11}, {45, 21}, {-16, 4}, {30, 6},
+        {-13, 37}, {-14, 51}, {33, 10}, {7, 15}, {53, -3}, {8, 38},
     },
 };
 
@@ -1555,14 +1555,15 @@ Score evaluate_pieces(const Mobility& mobility)
     BitBoard opp_attack = mobility.attacks[~C][PAWN];
 
     const Score* pe = piece_evals[eval_offset];
-    r += pe[0] * popcount(own_attack & position.color_bb[~C] & ~position.type_bb[PAWN]);
+    r += pe[0] * popcount(own_attack & position.color_bb[~C] & (position.type_bb[KNIGHT] | position.type_bb[BISHOP]));
+    r += pe[1] * popcount(own_attack & position.color_bb[~C] & (position.type_bb[ROOK] | position.type_bb[QUEEN]));
 
     if (position.type_bb[ROOK] && position.type_bb[PAWN])
     {
         BitBoard own_rooks = position.type_bb[ROOK] & position.color_bb[C];
 
-        r += pe[1] * popcount(own_rooks & ~smear<-FWD>(position.type_bb[PAWN]));
-        r += pe[2] * popcount(own_rooks & ~smear<-FWD>(own_pawns));
+        r += pe[2] * popcount(own_rooks & ~smear<-FWD>(position.type_bb[PAWN]));
+        r += pe[3] * popcount(own_rooks & ~smear<-FWD>(own_pawns));
     }
 
     if (position.type_bb[KNIGHT])
@@ -1570,25 +1571,25 @@ Score evaluate_pieces(const Mobility& mobility)
         BitBoard knights = position.type_bb[KNIGHT] & position.color_bb[C];
         BitBoard km = mobility.attacks[C][KNIGHT];
 
-        r -= pe[3] * popcount(km & opp_attack & ~(position.color_bb[~C] & ~position.type_bb[PAWN]));
-        r += pe[4] * popcount(km & position.color_bb[~C] & ~(position.type_bb[PAWN] | position.type_bb[KNIGHT]));
-        r -= pe[5] * popcount(km & position.type_bb[PAWN] & (position.color_bb[C] | opp_attack));
+        r -= pe[4] * popcount(km & opp_attack & ~(position.color_bb[~C] & ~position.type_bb[PAWN]));
+        r += pe[5] * popcount(km & position.color_bb[~C] & ~(position.type_bb[PAWN] | position.type_bb[KNIGHT]));
+        r -= pe[6] * popcount(km & position.type_bb[PAWN] & (position.color_bb[C] | opp_attack));
 
         constexpr BitBoard OUTPOST_RANKS = static_cast<BitBoard>(C == WHITE ? 0x00ffffff00000000ULL : 0x00000000ffffff00ULL);
-        r += pe[6] * popcount((knights | (km & ~position.color_bb[C])) & own_attack & ~opp_attack & OUTPOST_RANKS);
+        r += pe[7] * popcount((knights | (km & ~position.color_bb[C])) & own_attack & ~opp_attack & OUTPOST_RANKS);
     }
 
     if (position.type_bb[BISHOP])
     {
         BitBoard bishops = position.type_bb[BISHOP] & position.color_bb[C];
         BitBoard bblock = shift_signed<FWD - 1>(bishops & KING_SIDE) | shift_signed<FWD + 1>(bishops & QUEEN_SIDE);
-        r -= pe[7] * popcount(bblock & own_pawns);
+        r -= pe[8] * popcount(bblock & own_pawns);
         BitBoard bblock2 = shift_signed<2 * FWD - 2>(bishops & KING_SIDE) | shift_signed<2 * FWD + 2>(bishops & QUEEN_SIDE);
-        r -= pe[8] * popcount(bblock2 & (own_pawns | (opp_pawns & opp_attack)));
-        r += pe[9] * popcount(mobility.attacks[C][BISHOP] & position.color_bb[~C] & (position.type_bb[ROOK] | position.type_bb[QUEEN]));
+        r -= pe[9] * popcount(bblock2 & (own_pawns | (opp_pawns & opp_attack)));
+        r += pe[10] * popcount(mobility.attacks[C][BISHOP] & position.color_bb[~C] & (position.type_bb[ROOK] | position.type_bb[QUEEN]));
 
         if ((bishops & LIGHT_SQUARES) && (bishops & DARK_SQUARES))
-            r += pe[10];
+            r += pe[11];
     }
 
     BitBoard guarded = own_attack |
@@ -1598,8 +1599,8 @@ Score evaluate_pieces(const Mobility& mobility)
         (bishop_attack(king_sq, position.all_bb()) & (mobility.attacks[~C][BISHOP] | mobility.attacks[~C][QUEEN])) |
         (rook_attack(king_sq, position.all_bb()) & (mobility.attacks[~C][ROOK] | mobility.attacks[~C][QUEEN]))
     );
-    r -= pe[11] * popcount(safe_checks);
-    r -= pe[12] * popcount(king_attack[king_sq] & mobility.attacks2[~C] & ~guarded);
+    r -= pe[12] * popcount(safe_checks);
+    r -= pe[13] * popcount(king_attack[king_sq] & mobility.attacks2[~C] & ~guarded);
 
     return r;
 }

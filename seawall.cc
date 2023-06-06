@@ -1484,39 +1484,47 @@ Score king_evals[64][4] =
 #ifndef TUNE
 constexpr
 #endif
-Score piece_evals[8][14] =
+Score piece_evals[8][17] =
 {
     {
         {57, 89}, {37, 81}, {32, -12}, {17, 21}, {12, 2}, {38, 43}, {6, 10}, {3, 18},
-        {7, 60}, {12, 44}, {44, 60}, {5, 70}, {67, 7}, {65, -12},
+        {7, 60}, {12, 44}, {44, 60}, {67, 7}, {65, -12}, {-23, 7}, {-3, 28}, {-8, 70},
+        {2, 98},
     },
     {
         {58, 64}, {36, 47}, {23, -9}, {18, 26}, {13, 0}, {34, 36}, {4, 3}, {4, 19},
-        {11, 37}, {11, 37}, {39, 33}, {13, 67}, {36, 32}, {73, -27},
+        {11, 37}, {11, 37}, {39, 33}, {36, 32}, {73, -27}, {11, 0}, {6, -20}, {26, 68},
+        {21, 21},
     },
     {
         {57, 70}, {35, 75}, {39, -21}, {23, 33}, {10, -1}, {47, 18}, {7, 2}, {29, 8},
-        {33, 22}, {26, 24}, {40, 28}, {18, 82}, {99, -11}, {55, -16},
+        {33, 22}, {26, 24}, {40, 28}, {99, -11}, {55, -16}, {6, 1}, {6, -11}, {20, 82},
+        {19, 60},
     },
     {
         {41, 66}, {26, 59}, {49, -29}, {23, 30}, {17, -5}, {31, 29}, {0, 1}, {25, 4},
-        {26, 18}, {21, 18}, {27, 16}, {13, 69}, {96, -7}, {48, -19},
+        {26, 18}, {21, 18}, {27, 16}, {96, -7}, {48, -19}, {14, -2}, {-28, -34}, {34, 60},
+        {-11, 13},
     },
     {
         {50, 67}, {52, 94}, {56, -35}, {19, 22}, {1, 8}, {30, 22}, {21, -7}, {62, -25},
-        {9, 29}, {0, 28}, {24, 15}, {-7, 74}, {104, -17}, {15, 8},
+        {9, 29}, {0, 28}, {24, 15}, {104, -17}, {15, 8}, {-1, 4}, {-10, -37}, {4, 81},
+        {-7, 74},
     },
     {
         {4, 70}, {66, 144}, {66, -34}, {20, 12}, {-3, 5}, {39, 8}, {5, 3}, {61, -16},
-        {-5, 38}, {-10, 36}, {22, 31}, {60, 42}, {81, -7}, {6, 4},
+        {-5, 38}, {-10, 36}, {22, 31}, {81, -7}, {6, 4}, {3, 3}, {-51, -42}, {62, 35},
+        {55, 35},
     },
     {
         {60, 149}, {53, 145}, {80, -48}, {27, 2}, {-15, 29}, {10, -1}, {-19, 2}, {11, -17},
-        {-6, 31}, {3, 39}, {27, 15}, {4, 41}, {72, -12}, {21, 54},
+        {-6, 31}, {3, 39}, {27, 15}, {72, -12}, {21, 54}, {11, 0}, {3, -28}, {7, 58},
+        {9, 45},
     },
     {
         {41, 106}, {45, 110}, {60, -43}, {7, 14}, {-3, 11}, {45, 21}, {-16, 4}, {30, 6},
-        {-13, 37}, {-14, 51}, {33, 10}, {7, 15}, {53, -3}, {8, 38},
+        {-13, 37}, {-14, 51}, {33, 10}, {53, -3}, {8, 38}, {-2, 4}, {-16, -26}, {10, 19},
+        {11, 25},
     },
 };
 
@@ -1579,17 +1587,14 @@ Score evaluate_pieces(const Mobility& mobility)
         r += pe[7] * popcount((knights | (km & ~position.color_bb[C])) & own_attack & ~opp_attack & OUTPOST_RANKS);
     }
 
+    BitBoard bishops = position.type_bb[BISHOP] & position.color_bb[C];
     if (position.type_bb[BISHOP])
     {
-        BitBoard bishops = position.type_bb[BISHOP] & position.color_bb[C];
         BitBoard bblock = shift_signed<FWD - 1>(bishops & KING_SIDE) | shift_signed<FWD + 1>(bishops & QUEEN_SIDE);
         r -= pe[8] * popcount(bblock & own_pawns);
         BitBoard bblock2 = shift_signed<2 * FWD - 2>(bishops & KING_SIDE) | shift_signed<2 * FWD + 2>(bishops & QUEEN_SIDE);
         r -= pe[9] * popcount(bblock2 & (own_pawns | (opp_pawns & opp_attack)));
         r += pe[10] * popcount(mobility.attacks[C][BISHOP] & position.color_bb[~C] & (position.type_bb[ROOK] | position.type_bb[QUEEN]));
-
-        if ((bishops & LIGHT_SQUARES) && (bishops & DARK_SQUARES))
-            r += pe[11];
     }
 
     BitBoard guarded = own_attack |
@@ -1599,8 +1604,9 @@ Score evaluate_pieces(const Mobility& mobility)
         (bishop_attack(king_sq, position.all_bb()) & (mobility.attacks[~C][BISHOP] | mobility.attacks[~C][QUEEN])) |
         (rook_attack(king_sq, position.all_bb()) & (mobility.attacks[~C][ROOK] | mobility.attacks[~C][QUEEN]))
     );
-    r -= pe[12] * popcount(safe_checks);
-    r -= pe[13] * popcount(king_attack[king_sq] & mobility.attacks2[~C] & ~guarded);
+    r -= pe[11] * popcount(safe_checks);
+    r -= pe[12] * popcount(king_attack[king_sq] & mobility.attacks2[~C] & ~guarded);
+    r += pe[13 + !!(position.type_bb[QUEEN] & position.color_bb[C]) + 2 * !!((bishops & LIGHT_SQUARES) && (bishops & DARK_SQUARES))];
 
     return r;
 }

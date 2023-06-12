@@ -1285,7 +1285,10 @@ struct PawnEvalCache
     Score value;
 };
 
-static PawnEvalCache pawn_eval_cache;
+static constexpr int PAWN_EVAL_CACHE_SIZE_BITS = 5;
+static constexpr int PAWN_EVAL_CACHE_SIZE = 1 << PAWN_EVAL_CACHE_SIZE_BITS;
+
+static PawnEvalCache pawn_eval_cache[PAWN_EVAL_CACHE_SIZE];
 
 static constexpr int pawnless_king_table[64] =
 {
@@ -1614,12 +1617,14 @@ Score evaluate_pieces(const Mobility& mobility)
 int evaluate()
 {
     Score eval;
-    if (position.type_bb[PAWN] == pawn_eval_cache.pawns)
-        eval = pawn_eval_cache.value;
+    int pawn_index = static_cast<int>((position.type_bb[PAWN] * 0x496ea34db5092c93ULL) >> (64 - PAWN_EVAL_CACHE_SIZE_BITS));
+
+    if (position.type_bb[PAWN] == pawn_eval_cache[pawn_index].pawns)
+        eval = pawn_eval_cache[pawn_index].value;
     else
     {
-        pawn_eval_cache.pawns = position.type_bb[PAWN];
-        pawn_eval_cache.value = eval = evaluate_pawns<WHITE>() - evaluate_pawns<BLACK>();
+        pawn_eval_cache[pawn_index].pawns = position.type_bb[PAWN];
+        pawn_eval_cache[pawn_index].value = eval = evaluate_pawns<WHITE>() - evaluate_pawns<BLACK>();
     }
     Mobility mobility{};
     eval += evaluate_mobility<WHITE>(mobility) - evaluate_mobility<BLACK>(mobility);
@@ -2244,7 +2249,7 @@ void Search::iterate(int max_depth)
 
     for (root_depth = 1; root_depth <= max_depth; ++root_depth)
     {
-        pawn_eval_cache = {};
+        std::fill_n(pawn_eval_cache, PAWN_EVAL_CACHE_SIZE, PawnEvalCache{});
         sel_depth = 0;
 
         auto v = search(true, 0, root_depth, -SCORE_MATE, SCORE_MATE);

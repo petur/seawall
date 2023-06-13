@@ -1337,6 +1337,17 @@ int evaluate_pawnless(int v)
     return v;
 }
 
+template<Color C>
+int evaluate_single_pawn(int v)
+{
+    constexpr int FWD = C == WHITE ? 8 : -8;
+    BitBoard own_pawns = position.type_bb[PAWN] & position.color_bb[C];
+
+    if (smear<FWD>(shift_signed<FWD>(own_pawns)) & position.type_bb[KING] & position.color_bb[~C])
+        v /= 2;
+    return v;
+}
+
 #ifndef TUNE
 constexpr
 #endif
@@ -1636,6 +1647,8 @@ int evaluate()
     int v = (pieces * result.mid + (48 - pieces) * result.end) / 48;
     if (!position.type_bb[PAWN])
         return evaluate_pawnless(v);
+    else if (popcount(position.all_bb()) <= 5 && popcount(position.type_bb[PAWN]) == 1)
+        return (position.type_bb[PAWN] & position.color_bb[WHITE]) ? evaluate_single_pawn<WHITE>(v) : evaluate_single_pawn<BLACK>(v);
     return v;
 }
 

@@ -2026,7 +2026,8 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     if (he && ((hv > eval && (he->flags & LOWER)) || (hv < eval && (he->flags & UPPER))))
         eval = hv;
 
-    if (!pv && !checkers && depth <= 3 && eval > beta + 193 * (depth - 1) + 39)
+    if (!pv && !checkers && depth <= 3 && eval > beta + 193 * (depth - 1) + 39 &&
+            (position.color_bb[position.next] & ~position.type_bb[KING]))
         return {beta, NULL_MOVE};
 
     if (ply >= sel_depth)

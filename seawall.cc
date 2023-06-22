@@ -974,6 +974,7 @@ struct alignas(16) Stack
     Move prev_move;
 
     void save_killer(Move move);
+    bool is_killer(Move move) const { return move == killer_moves[0] || move == killer_moves[1]; }
 };
 
 void Stack::save_killer(Move move)
@@ -1165,7 +1166,7 @@ std::int16_t MoveGen::rank_capture(Move mv) const
 std::int16_t MoveGen::rank_quiet(Move mv) const
 {
     std::int16_t rank = history[position.next][mv & FROM_TO_MASK].value;
-    if (mv == stack.killer_moves[0] || mv == stack.killer_moves[1])
+    if (stack.is_killer(mv))
         rank += 16354;
     if (mv == counter_move)
         rank += 4445;
@@ -2087,7 +2088,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
             continue;
 
         if (!checkers && !checks && depth <= 7 && alpha > -SCORE_WIN && eval < alpha - 11 * (depth - 1) - 34 &&
-                !(type(mv) & (CAPTURE | PROMOTION)) && mv != prev_best && mv != stack[ply].killer_moves[0] && mv != stack[ply].killer_moves[1] &&
+                !(type(mv) & (CAPTURE | PROMOTION)) && mv != prev_best &&
                 popcount(position.color_bb[~position.next] & ~position.type_bb[PAWN]) > 1)
         {
             ++mcp;
@@ -2121,7 +2122,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
 
         int reduction = 0;
         if (new_depth >= 3 && move_count && !checkers && !(type(mv) & (CAPTURE | PROMOTION)) &&
-                mv != prev_best && mv != stack[ply].killer_moves[0] && mv != stack[ply].killer_moves[1])
+                mv != prev_best && !stack[ply].is_killer(mv))
         {
             reduction = move_count - 2;
             if (he && !(he->flags & LOWER))

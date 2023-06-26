@@ -2127,6 +2127,8 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
             reduction = move_count - 2;
             if (he && !(he->flags & LOWER))
                 reduction += 3;
+            if (pv)
+                reduction += 2;
             reduction -= history[position.next][mv & FROM_TO_MASK].value / 1915;
             reduction = std::clamp(reduction / 4, 0, depth / 3);
         }

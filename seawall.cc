@@ -1626,23 +1626,34 @@ Score evaluate_pieces(const Mobility& mobility)
     return r;
 }
 
-int evaluate()
-{
-    Score eval;
-    int pawn_index = static_cast<int>((position.type_bb[PAWN] * 0x496ea34db5092c93ULL) >> (64 - PAWN_EVAL_CACHE_SIZE_BITS));
+constexpr int SCORE_MATE = 32767;
+constexpr int SCORE_WIN = 32000;
 
-    if (position.type_bb[PAWN] == pawn_eval_cache[pawn_index].pawns)
-        eval = pawn_eval_cache[pawn_index].value;
-    else
+int evaluate(int alpha = -SCORE_WIN, int beta = SCORE_WIN)
+{
+    Score lazy_eval = position.piece_square_values[position.next] - position.piece_square_values[~position.next];
+    Score eval{};
+
+    constexpr int lazy_threshold = 300;
+    if ((lazy_eval.mid > alpha - lazy_threshold && lazy_eval.mid < beta + lazy_threshold) ||
+            (lazy_eval.end > alpha - lazy_threshold && lazy_eval.end < beta + lazy_threshold))
     {
-        pawn_eval_cache[pawn_index].pawns = position.type_bb[PAWN];
-        pawn_eval_cache[pawn_index].value = eval = evaluate_pawns<WHITE>() - evaluate_pawns<BLACK>();
+        int pawn_index = static_cast<int>((position.type_bb[PAWN] * 0x496ea34db5092c93ULL) >> (64 - PAWN_EVAL_CACHE_SIZE_BITS));
+
+        if (position.type_bb[PAWN] == pawn_eval_cache[pawn_index].pawns)
+            eval = pawn_eval_cache[pawn_index].value;
+        else
+        {
+            pawn_eval_cache[pawn_index].pawns = position.type_bb[PAWN];
+            pawn_eval_cache[pawn_index].value = eval = evaluate_pawns<WHITE>() - evaluate_pawns<BLACK>();
+        }
+
+        Mobility mobility{};
+        eval += evaluate_mobility<WHITE>(mobility) - evaluate_mobility<BLACK>(mobility);
+        eval += evaluate_pieces<WHITE>(mobility) - evaluate_pieces<BLACK>(mobility);
     }
-    Mobility mobility{};
-    eval += evaluate_mobility<WHITE>(mobility) - evaluate_mobility<BLACK>(mobility);
-    eval += evaluate_pieces<WHITE>(mobility) - evaluate_pieces<BLACK>(mobility);
-    eval += position.piece_square_values[WHITE] - position.piece_square_values[BLACK];
-    Score result = Score{22, 12} + (position.next == WHITE ? eval : -eval);
+
+    Score result = Score{22, 12} + lazy_eval + (position.next == WHITE ? eval : -eval);
 
     int pieces = popcount(position.all_bb()) + popcount(position.all_bb() & ~position.type_bb[PAWN]) - 2;
     int v = (pieces * result.mid + (48 - pieces) * result.end) / 48;
@@ -1652,9 +1663,6 @@ int evaluate()
         return (position.type_bb[PAWN] & position.color_bb[WHITE]) ? evaluate_single_pawn<WHITE>(v) : evaluate_single_pawn<BLACK>(v);
     return v;
 }
-
-constexpr int SCORE_MATE = 32767;
-constexpr int SCORE_WIN = 32000;
 
 enum HashFlags : std::uint8_t { GEN_MASK = 0x3f, LOWER = 0x40, UPPER = 0x80 };
 
@@ -1926,7 +1934,7 @@ int Search::qsearch(int ply, int depth, int alpha, int beta)
     Square king_sq = first_square(position.type_bb[KING] & position.color_bb[position.next]);
     BitBoard checkers = attackers(king_sq, ~position.next);
 
-    int pat = checkers ? -SCORE_MATE + ply : evaluate();
+    int pat = checkers ? -SCORE_MATE + ply : evaluate(alpha, beta);
     if (pat >= beta)
         return beta;
     if (pat > alpha)
@@ -2023,7 +2031,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
 
     Square king_sq = first_square(position.type_bb[KING] & position.color_bb[position.next]);
     BitBoard checkers = attackers(king_sq, ~position.next);
-    int eval = evaluate();
+    int eval = evaluate(alpha, beta);
     if (he && ((hv > eval && (he->flags & LOWER)) || (hv < eval && (he->flags & UPPER))))
         eval = hv;
 

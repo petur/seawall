@@ -2,7 +2,9 @@
 
 This is an [UCI] chess engine. It started as an attempt to build a minimal program that was able to play chess. Over
 time, it has gained features to make it stronger, but it still implements only a subset of UCI necessary to play
-games. The evaluation function uses only piece square tables and bitboards; there is no loop over the pieces.
+games. The evaluation function is based on piece square tables and bitboards; a loop over the pieces is used only to
+calculate mobility. The evaluation has been tuned using positions from self-play games. The UCI implementation is
+single threaded, using polling to handle input during search.
 
 Some ideas have been borrowed more directly than others; the obstruction difference algorithm is based on the version
 from [Chess Movegen], while the use of a low pass filter and capture history for move ordering were borrowed from

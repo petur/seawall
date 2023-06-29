@@ -5,7 +5,7 @@ ARCH := native
 endif
 CXXFLAGS += -Wall -Wextra -Werror -std=c++17 -Ofast -march=$(ARCH) -mtune=$(ARCH) -flto -fno-rtti -fno-exceptions $(PGOFLAGS)
 
-version :=
+version := 20230629
 ifeq ($(version),)
 version := $(shell date '+%Y%m%d')
 commit := $(shell git rev-parse --short HEAD)

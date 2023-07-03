@@ -1992,6 +1992,17 @@ int Search::qsearch(int ply, int depth, int alpha, int beta)
     return alpha;
 }
 
+template<Color C>
+bool is_passed_pawn_move(Move mv)
+{
+    constexpr int FWD = C == WHITE ? 8 : -8;
+    BitBoard all_pawns = position.type_bb[PAWN];
+    BitBoard opp_pawns = all_pawns & position.color_bb[~C];
+    BitBoard opp_attack = shift_signed<-FWD - 1>(opp_pawns & ~FILE_A) | shift_signed<-FWD + 1>(opp_pawns & ~FILE_H);
+
+    return bb(to(mv)) & (C == WHITE ? 0x00ffffff00000000ULL : 0x00000000ffffff00ULL) & ~smear<-FWD>(all_pawns | opp_attack);
+}
+
 std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int beta, Move skip_move)
 {
     if (ply > 0)
@@ -2111,8 +2122,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
                 to(mv) == to(stack[ply].prev_move) && eval + material[type(position.squares[to(mv)])].mid > alpha - 28 && eval < beta + 18)
             extension++;
         else if (!(type(mv) & CAPTURE) && type(position.squares[from(mv)]) == PAWN && ply < 2 * root_depth &&
-                (bb(to(mv)) & (position.next == WHITE ? 0x00ffffff00000000ULL : 0x00000000ffffff00ULL)) &&
-                 !(ray[to(mv)][position.next == WHITE ? 5 : 1] & position.type_bb[PAWN]))
+                (position.next == WHITE ? is_passed_pawn_move<WHITE>(mv) : is_passed_pawn_move<BLACK>(mv)))
             extension++;
         else if (!skip_move && mv == prev_best &&
                 he && (he->flags & LOWER) && he->value >= -SCORE_WIN &&

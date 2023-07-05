@@ -2122,6 +2122,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
                 to(mv) == to(stack[ply].prev_move) && eval + material[type(position.squares[to(mv)])].mid > alpha - 28 && eval < beta + 18)
             extension++;
         else if (!(type(mv) & CAPTURE) && type(position.squares[from(mv)]) == PAWN && ply < 2 * root_depth &&
+                eval < beta + 50 &&
                 (position.next == WHITE ? is_passed_pawn_move<WHITE>(mv) : is_passed_pawn_move<BLACK>(mv)))
             extension++;
         else if (!skip_move && mv == prev_best &&

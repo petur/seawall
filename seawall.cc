@@ -1058,7 +1058,7 @@ struct MoveGen
 void MoveGen::generate_target(Square sq, Square target, MoveType mt)
 {
     Move mv = move(sq, target, mt);
-    if (generated == BEST || mv != best_move)
+    if ((generated == BEST) == (mv == best_move))
         moves[count++] = {mv, (mt & CAPTURE) ? rank_capture(mv) : rank_quiet(mv)};
 }
 

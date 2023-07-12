@@ -972,6 +972,7 @@ struct alignas(16) Stack
     std::uint64_t key;
     Move killer_moves[2];
     Move prev_move;
+    bool in_nmp;
 
     void save_killer(Move move);
     bool is_killer(Move move) const { return move == killer_moves[0] || move == killer_moves[1]; }
@@ -2057,23 +2058,24 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
 
     if (!pv &&
             ply > 1 &&
-            stack[ply].prev_move != NULL_MOVE &&
+            !stack[ply].in_nmp &&
+            !stack[ply - 1].in_nmp &&
             depth >= 4 &&
             eval > beta + 84 &&
             !checkers &&
             alpha > -SCORE_WIN &&
             popcount(position.color_bb[position.next] & ~position.type_bb[PAWN]) > 1)
     {
+        stack[ply].in_nmp = true;
         Memo memo = do_move(ply, NULL_MOVE);
 
         int v = -search(false, ply + 1, depth - (12 * (eval - beta) + 278 * (depth - 1) + 3297) / 2048, -beta, -beta + 1).first;
         undo_move(NULL_MOVE, memo);
         if (v >= beta)
-        {
             v = search(false, ply, (depth - 1) / 2, beta - 1, beta).first;
-            if (v >= beta)
-                return {beta, NULL_MOVE};
-        }
+        stack[ply].in_nmp = false;
+        if (v >= beta)
+            return {beta, NULL_MOVE};
     }
 
     if (!he && !checkers && eval > alpha && depth > 1)

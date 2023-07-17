@@ -2057,7 +2057,6 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         pv_lines[ply + 1].length = 0;
 
     if (!pv &&
-            ply > 1 &&
             !stack[ply].in_nmp &&
             !stack[ply - 1].in_nmp &&
             depth >= 4 &&

@@ -1657,7 +1657,7 @@ int evaluate(int alpha = -SCORE_WIN, int beta = SCORE_WIN)
     Score result = Score{22, 12} + lazy_eval + (position.next == WHITE ? eval : -eval);
 
     int pieces = popcount(position.all_bb()) + popcount(position.all_bb() & ~position.type_bb[PAWN]) - 2;
-    int v = (pieces * result.mid + (48 - pieces) * result.end) / 48;
+    int v = (4 * pieces * result.mid + 3 * (48 - pieces) * result.end) / 192;
     if (!position.type_bb[PAWN])
         return evaluate_pawnless(v);
     else if (popcount(position.all_bb()) <= 5 && popcount(position.type_bb[PAWN]) == 1)

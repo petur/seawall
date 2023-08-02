@@ -1,7 +1,7 @@
 #include <algorithm>
 #include <cassert>
+#include <chrono>
 #include <cmath>
-#include <ctime>
 #include <deque>
 #include <iomanip>
 #include <iostream>
@@ -1774,17 +1774,19 @@ void update_pv(Move best_move, int ply, bool end)
     }
 }
 
+using Clock = std::chrono::steady_clock;
+
 struct Search
 {
     std::istream& in;
     std::ostream& out;
     std::deque<std::string>& commands;
-    std::clock_t total_time;
-    std::clock_t increment;
-    std::clock_t movetime;
+    Clock::duration total_time;
+    Clock::duration increment;
+    Clock::duration movetime;
     int moves_to_go;
-    std::clock_t max_time;
-    std::clock_t start;
+    Clock::duration max_time;
+    Clock::time_point start;
     long long nodes;
     unsigned int time_mask;
     int root_depth;
@@ -1795,12 +1797,12 @@ struct Search
 
     Search(
         std::istream& i, std::ostream& o, std::deque<std::string>& cmd,
-        std::clock_t time, std::clock_t inc, std::clock_t movetime, int moves_to_go, Stack* stack);
+        Clock::duration time, Clock::duration inc, Clock::duration movetime, int moves_to_go, Stack* stack);
 
     bool is_stopped();
     bool check_stop_command();
     bool check_time(int changes, int improving);
-    void set_time_mask(std::clock_t remaining);
+    void set_time_mask(Clock::duration remaining);
     bool repetition(int ply) const;
 
     int qsearch(int ply, int depth, int alpha, int beta);
@@ -1821,13 +1823,13 @@ struct Search
 
 Search::Search(
     std::istream& i, std::ostream& o, std::deque<std::string>& cmd,
-    std::clock_t time, std::clock_t inc, std::clock_t mt, int mtg, Stack* st)
+    Clock::duration time, Clock::duration inc, Clock::duration mt, int mtg, Stack* st)
     : in{i}, out{o}, commands{cmd}, total_time{time}, increment{inc}, movetime{mt}, moves_to_go{mtg}, max_time{mt},
-    start{std::clock()}, nodes{}, time_mask{0x1ff}, root_depth{}, sel_depth{}, stopped{}, best_move{}, stack{st}
+    start{Clock::now()}, nodes{}, time_mask{0x1ff}, root_depth{}, sel_depth{}, stopped{}, best_move{}, stack{st}
 {
-    if (total_time != static_cast<std::clock_t>(-1))
+    if (total_time != Clock::duration::min())
     {
-        total_time -= std::min<std::clock_t>(5 * total_time / 32, CLOCKS_PER_SEC);
+        total_time -= std::min(5 * total_time / 32, Clock::duration(std::chrono::seconds(1)));
         movetime = max_time = std::min(movetime, total_time);
     }
 }
@@ -1836,7 +1838,7 @@ bool Search::is_stopped()
 {
     if (!stopped && (nodes & time_mask) == 0)
     {
-        std::clock_t elapsed = std::clock() - start;
+        Clock::duration elapsed = Clock::now() - start;
         if (elapsed > max_time)
             stopped = true;
         else
@@ -1873,18 +1875,18 @@ bool Search::check_stop_command()
 
 bool Search::check_time(int changes, int improving)
 {
-    if (total_time != static_cast<std::clock_t>(-1) && !stopped)
+    if (total_time != Clock::duration::min() && !stopped)
     {
         int pieces = popcount(position.color_bb[WHITE] | position.color_bb[BLACK]);
         max_time = std::min(
             total_time,
             20 * total_time / ((4 + ((changes <= 1) * std::max(0, improving - 1))) * std::min(37 + pieces, 5 * moves_to_go)) + 4 * increment);
-        std::clock_t target_time = std::min(
+        Clock::duration target_time = std::min(
             max_time,
             36 * total_time / ((4 + ((changes <= 1) * std::max(0, improving - 1))) * std::min(17 * std::max(16, pieces), 13 * moves_to_go))
                     + 22 * increment / (26 + pieces));
 
-        std::clock_t elapsed = std::clock() - start;
+        Clock::duration elapsed = Clock::now() - start;
         if (elapsed > target_time)
             stopped = true;
 
@@ -1893,19 +1895,19 @@ bool Search::check_time(int changes, int improving)
     return stopped;
 }
 
-void Search::set_time_mask(std::clock_t remaining)
+void Search::set_time_mask(Clock::duration remaining)
 {
-    if (remaining < CLOCKS_PER_SEC / 512)
+    if (remaining < std::chrono::milliseconds(2))
         time_mask = 0x1ff;
-    else if (remaining < CLOCKS_PER_SEC / 128)
+    else if (remaining < std::chrono::milliseconds(5))
         time_mask = 0x3ff;
-    else if (remaining < CLOCKS_PER_SEC / 32)
+    else if (remaining < std::chrono::milliseconds(25))
         time_mask = 0x7ff;
-    else if (remaining < CLOCKS_PER_SEC / 8)
+    else if (remaining < std::chrono::milliseconds(100))
         time_mask = 0xfff;
-    else if (remaining < CLOCKS_PER_SEC / 2)
+    else if (remaining < std::chrono::milliseconds(500))
         time_mask = 0x1fff;
-    else if (remaining < CLOCKS_PER_SEC * 2)
+    else if (remaining < std::chrono::milliseconds(2000))
         time_mask = 0x3fff;
     else
         time_mask = 0x7fff;
@@ -2261,7 +2263,7 @@ void Search::print_info(int depth, int score)
         out << "mate " << ((-SCORE_MATE - score) / 2);
     else
         out << "cp " << score;
-    double elapsed = static_cast<double>(std::clock() - start) / CLOCKS_PER_SEC;
+    double elapsed = std::chrono::duration_cast<std::chrono::duration<double> >(Clock::now() - start).count();
     out << " nodes " << nodes
         << std::fixed << std::setprecision(0) << " time " << (elapsed * 1000.);
     if (elapsed > 0)
@@ -2427,9 +2429,9 @@ void uci_main()
         else if (token == "go")
         {
             int max_depth = 128;
-            std::clock_t time = -1;
-            std::clock_t inc = 0;
-            std::clock_t movetime = std::numeric_limits<std::clock_t>::max();
+            Clock::duration time = Clock::duration::min();
+            Clock::duration inc = Clock::duration::zero();
+            Clock::duration movetime = Clock::duration::max();
             int moves_to_go = 10000;
 
             while (parser >> token)
@@ -2440,19 +2442,19 @@ void uci_main()
                 {
                     long millis;
                     parser >> millis;
-                    time = millis * CLOCKS_PER_SEC / 1000L;
+                    time = std::chrono::milliseconds(millis);
                 }
                 if (token == (position.next == WHITE ? "winc" : "binc"))
                 {
                     long millis;
                     parser >> millis;
-                    inc = millis * CLOCKS_PER_SEC / 1000L;
+                    inc = std::chrono::milliseconds(millis);
                 }
                 if (token == "movetime")
                 {
                     long millis;
                     parser >> millis;
-                    movetime = millis * CLOCKS_PER_SEC / 1000L;
+                    movetime = std::chrono::milliseconds(millis);
                 }
                 if (token == "movestogo")
                     parser >> moves_to_go;

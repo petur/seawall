@@ -2045,7 +2045,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
 
     Square king_sq = first_square(position.type_bb[KING] & position.color_bb[position.next]);
     BitBoard checkers = attackers(king_sq, ~position.next);
-    int eval = evaluate(alpha, beta);
+    int eval = checkers ? -SCORE_MATE + ply : evaluate(alpha, beta);
     if (he && ((hv > eval && (he->flags & LOWER)) || (hv < eval && (he->flags & UPPER))))
         eval = hv;
 

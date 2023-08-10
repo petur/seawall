@@ -2079,8 +2079,8 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
             return {beta, NULL_MOVE};
     }
 
-    if (!he && !checkers && eval > alpha && depth > 1)
-        depth--;
+    if (!he && !checkers && eval > alpha)
+        depth = std::max(1, depth - 1 - (eval > beta + 200));
 
     Move& counter_move = counter_moves[counter_index(stack[ply].prev_move)];
     MoveGen gen{QUIETS, checkers, prev_best, counter_move, stack[ply]};

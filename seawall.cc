@@ -1807,7 +1807,7 @@ struct Search
 
     int qsearch(int ply, int depth, int alpha, int beta);
     std::pair<int, Move> search(bool pv, int ply, int depth, int alpha, int beta, Move skip_move = NULL_MOVE);
-    void print_info(int depth, int score);
+    void print_info(int depth, int score, bool upperbound);
     void iterate(int max_depth);
 
     Memo do_move(int ply, Move mv)
@@ -2254,7 +2254,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     return {alpha, best};
 }
 
-void Search::print_info(int depth, int score)
+void Search::print_info(int depth, int score, bool upperbound)
 {
     out << "info depth " << depth << " seldepth " << sel_depth << " score ";
     if (score > SCORE_WIN)
@@ -2263,13 +2263,15 @@ void Search::print_info(int depth, int score)
         out << "mate " << ((-SCORE_MATE - score) / 2);
     else
         out << "cp " << score;
+    if (upperbound)
+        out << " upperbound";
     double elapsed = std::chrono::duration_cast<std::chrono::duration<double> >(Clock::now() - start).count();
     out << " nodes " << nodes
         << std::fixed << std::setprecision(0) << " time " << (elapsed * 1000.);
     if (elapsed > 0)
         out << " nps " << (nodes / elapsed);
     out << " hashfull " << hash_usage();
-    if (pv_lines[0].length > 0)
+    if (pv_lines[0].length > 0 && !upperbound)
     {
         out << " pv";
         for (int i = 0; i < pv_lines[0].length; i++)
@@ -2291,7 +2293,17 @@ void Search::iterate(int max_depth)
         std::fill_n(pawn_eval_cache, PAWN_EVAL_CACHE_SIZE, PawnEvalCache{});
         sel_depth = 0;
 
-        auto v = search(true, 0, root_depth, -SCORE_MATE, SCORE_MATE);
+        int alpha = root_depth >= 4 && best_score > -SCORE_WIN ? best_score - 300 : -SCORE_MATE;
+        auto v = search(true, 0, root_depth, alpha, SCORE_MATE);
+
+        if (alpha > -SCORE_MATE && v.first <= alpha && !check_time(changes, improving))
+        {
+            print_info(root_depth, best_score, true);
+
+            auto vv = search(true, 0, root_depth, -SCORE_MATE, SCORE_MATE);
+            if (vv.second)
+                v = vv;
+        }
 
         if (v.second)
         {
@@ -2315,7 +2327,7 @@ void Search::iterate(int max_depth)
             changes--;
 
         assert(best_move != NULL_MOVE);
-        print_info(root_depth, best_score);
+        print_info(root_depth, best_score, false);
 
         if (check_time(changes, improving))
             break;

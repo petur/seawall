@@ -2298,7 +2298,7 @@ void Search::iterate(int max_depth)
 
         if (alpha > -SCORE_MATE && v.first <= alpha && !check_time(changes, improving))
         {
-            print_info(root_depth, best_score, true);
+            print_info(root_depth, v.first, true);
 
             auto vv = search(true, 0, root_depth, -SCORE_MATE, SCORE_MATE);
             if (vv.second)

@@ -973,6 +973,7 @@ struct alignas(16) Stack
     Move killer_moves[2];
     Move prev_move;
     bool in_nmp;
+    bool singular;
 
     void save_killer(Move move);
     bool is_killer(Move move) const { return move == killer_moves[0] || move == killer_moves[1]; }
@@ -1880,10 +1881,10 @@ bool Search::check_time(int changes, int improving)
         int pieces = popcount(position.color_bb[WHITE] | position.color_bb[BLACK]);
         max_time = std::min(
             total_time,
-            20 * total_time / ((4 + ((changes <= 1) * std::max(0, improving - 1))) * std::min(37 + pieces, 5 * moves_to_go)) + 4 * increment);
+            20 * total_time / ((4 + ((changes <= 1) * (stack[0].singular + std::max(0, improving - 1)))) * std::min(37 + pieces, 5 * moves_to_go)) + 4 * increment);
         Clock::duration target_time = std::min(
             max_time,
-            36 * total_time / ((4 + ((changes <= 1) * std::max(0, improving - 1))) * std::min(17 * std::max(16, pieces), 13 * moves_to_go))
+            36 * total_time / ((4 + ((changes <= 1) * (stack[0].singular + std::max(0, improving - 1)))) * std::min(17 * std::max(16, pieces), 13 * moves_to_go))
                     + 22 * increment / (26 + pieces));
 
         Clock::duration elapsed = Clock::now() - start;
@@ -2057,6 +2058,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         sel_depth = ply + 1;
     if (pv)
         pv_lines[ply + 1].length = 0;
+    stack[ply].singular = false;
 
     if (!pv &&
             !stack[ply].in_nmp &&
@@ -2135,7 +2137,10 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
             int sbeta = he->value - 6 * depth;
             int sresult = search(false, ply, depth / 2, sbeta - 1, sbeta, prev_best).first;
             if (sresult < sbeta)
+            {
                 extension++;
+                stack[ply].singular = true;
+            }
             else if (sbeta >= beta)
                 extension--;
         }

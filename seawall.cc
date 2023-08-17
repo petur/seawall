@@ -2235,21 +2235,18 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
             if (stack[ply].prev_move)
                 counter_move = best;
         }
-        if (depth > 1)
+        int inc = 40 * (depth - 1) + 597;
+        MoveHistory* hist = history[position.next];
+        for (int i = gen.index - 1; i >= 0; --i)
         {
-            int inc = 40 * (depth - 2) + 637;
-            MoveHistory* hist = history[position.next];
-            for (int i = gen.index - 1; i >= 0; --i)
-            {
-                Move m = gen.moves[i].move;
-                if (!m)
-                    continue;
-                bool cut = (m == best);
-                if (type(m) & CAPTURE)
-                    capture_history[6 * type(position.squares[to(m)]) + type(position.squares[from(m)])][to(m)].hit(inc, cut);
-                else
-                    hist[m & FROM_TO_MASK].hit(inc, cut);
-            }
+            Move m = gen.moves[i].move;
+            if (!m)
+                continue;
+            bool cut = (m == best);
+            if (type(m) & CAPTURE)
+                capture_history[6 * type(position.squares[to(m)]) + type(position.squares[from(m)])][to(m)].hit(inc, cut);
+            else
+                hist[m & FROM_TO_MASK].hit(inc, cut);
         }
     }
     save_hash(alpha, ply, depth, best ? best : prev_best, orig_alpha, beta, skip_move);

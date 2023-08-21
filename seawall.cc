@@ -1965,7 +1965,8 @@ int Search::qsearch(int ply, int depth, int alpha, int beta)
         }
     }
 
-    MoveGen gen{checkers ? QUIETS : CAPTURES, checkers, best, NULL_MOVE, stack[ply]};
+    Move& counter_move = counter_moves[checkers ? counter_index(stack[ply].prev_move) : (COUNTER_MOVE_SIZE - 1)];
+    MoveGen gen{checkers ? QUIETS : CAPTURES, checkers, best, counter_move, stack[ply]};
 
     while (Move mv = gen.next())
     {

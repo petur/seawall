@@ -1614,7 +1614,7 @@ Score evaluate_pieces(const Mobility& mobility)
         r += pe[10] * popcount(mobility.attacks[C][BISHOP] & position.color_bb[~C] & (position.type_bb[ROOK] | position.type_bb[QUEEN]));
     }
 
-    r += pe[11] * popcount(mobility.attacks2[C] & position.color_bb[~C]);
+    r += pe[11] * popcount(mobility.attacks2[C] & position.color_bb[~C] & ~position.type_bb[PAWN]);
 
     BitBoard guarded = own_attack |
         mobility.attacks[C][KNIGHT] | mobility.attacks[C][BISHOP] | mobility.attacks[C][ROOK] | mobility.attacks[C][QUEEN];

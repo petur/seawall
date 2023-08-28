@@ -1161,7 +1161,7 @@ template<PieceType Type> void MoveGen::generate_pieces(MoveGenType gen, BitBoard
 
 std::int16_t MoveGen::rank_capture(Move mv) const
 {
-    return static_cast<std::int16_t>(7692 * (type(position.squares[to(mv)]) - 3) +
+    return static_cast<std::int16_t>(7660 * (type(position.squares[to(mv)]) - 3) +
             capture_history[6 * type(position.squares[to(mv)]) + type(position.squares[from(mv)])][to(mv)].value);
 }
 
@@ -1171,7 +1171,7 @@ std::int16_t MoveGen::rank_quiet(Move mv) const
     if (stack.is_killer(mv))
         rank += 16354;
     if (mv == counter_move)
-        rank += 4509;
+        rank += 4523;
     return rank;
 }
 
@@ -1638,7 +1638,7 @@ int evaluate(int alpha = -SCORE_WIN, int beta = SCORE_WIN)
     Score lazy_eval = position.piece_square_values[position.next] - position.piece_square_values[~position.next];
     Score eval{};
 
-    constexpr int lazy_threshold = 305;
+    constexpr int lazy_threshold = 296;
     if ((lazy_eval.mid > alpha - lazy_threshold && lazy_eval.mid < beta + lazy_threshold) ||
             (lazy_eval.end > alpha - lazy_threshold && lazy_eval.end < beta + lazy_threshold))
     {
@@ -1663,7 +1663,7 @@ int evaluate(int alpha = -SCORE_WIN, int beta = SCORE_WIN)
 #ifdef TUNE
     constexpr int ENDGAME_WEIGHT = MIDGAME_WEIGHT;
 #else
-    constexpr int ENDGAME_WEIGHT = 37;
+    constexpr int ENDGAME_WEIGHT = 36;
 #endif
 
     int pieces = popcount(position.all_bb()) + popcount(position.all_bb() & ~position.type_bb[PAWN]) - 2;
@@ -1975,7 +1975,7 @@ int Search::qsearch(int ply, int depth, int alpha, int beta)
         if (is_stopped())
             return alpha;
 
-        if (!checkers && !(type(mv) & PROMOTION) && pat + material[type(position.squares[to(mv)])].mid < alpha - 89)
+        if (!checkers && !(type(mv) & PROMOTION) && pat + material[type(position.squares[to(mv)])].mid < alpha - 101)
             continue;
 
         if (!checkers && !(type(mv) & PROMOTION) && mv != best &&
@@ -2060,7 +2060,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     if (he && ((hv > eval && (he->flags & LOWER)) || (hv < eval && (he->flags & UPPER))))
         eval = hv;
 
-    if (!pv && !checkers && depth <= 3 && eval > beta + 194 * (depth - 1) + 40 &&
+    if (!pv && !checkers && depth <= 3 && eval > beta + 192 * (depth - 1) + 41 &&
             (position.color_bb[position.next] & ~position.type_bb[KING]))
         return {beta, NULL_MOVE};
 
@@ -2082,7 +2082,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         stack[ply].in_nmp = true;
         Memo memo = do_move(ply, NULL_MOVE);
 
-        int v = -search(false, ply + 1, depth - (13 * (eval - beta) + 309 * (depth - 1) + 3431) / 2048, -beta, -beta + 1).first;
+        int v = -search(false, ply + 1, depth - (13 * (eval - beta) + 331 * (depth - 1) + 3428) / 2048, -beta, -beta + 1).first;
         undo_move(NULL_MOVE, memo);
         if (v >= beta)
             v = search(false, ply, (depth - 1) / 2, beta - 1, beta).first;
@@ -2092,7 +2092,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     }
 
     if (!he && !checkers && eval > alpha)
-        depth = std::max(1, depth - 1 - (eval > beta + 200));
+        depth = std::max(1, depth - 1 - (eval > beta + 195));
 
     Move& counter_move = counter_moves[counter_index(stack[ply].prev_move)];
     MoveGen gen{QUIETS, checkers, prev_best, counter_move, stack[ply]};
@@ -2111,17 +2111,17 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
             continue;
         }
         bool checks = is_check(mv, opp_king_sq);
-        if (!checkers && !checks && move_count && depth <= 5 && eval < alpha - (210 * (depth - 1) + 50) && !(type(mv) & (CAPTURE | PROMOTION)))
+        if (!checkers && !checks && move_count && depth <= 5 && eval < alpha - (209 * (depth - 1) + 55) && !(type(mv) & (CAPTURE | PROMOTION)))
             continue;
         if (!checkers && !checks && move_count && depth <= 1 && (type(mv) & CAPTURE) && !(type(mv) & PROMOTION) &&
-                eval + material[type(position.squares[to(mv)])].mid < alpha - 66)
+                eval + material[type(position.squares[to(mv)])].mid < alpha - 55)
             continue;
-        if (!checkers && !checks && move_count && depth <= 2 && !(type(mv) & (CAPTURE | PROMOTION)) && eval < beta - 200 * (depth - 1) + 149 &&
+        if (!checkers && !checks && move_count && depth <= 2 && !(type(mv) & (CAPTURE | PROMOTION)) && eval < beta - 200 * (depth - 1) + 147 &&
                 (pawn_attack[position.next][to(mv)] & position.type_bb[PAWN] & position.color_bb[~position.next]) &&
                 type(position.squares[from(mv)]) != PAWN)
             continue;
 
-        if (!checkers && !checks && depth <= 7 && alpha > -SCORE_WIN && eval < alpha - 11 * (depth - 1) - 26 &&
+        if (!checkers && !checks && depth <= 7 && alpha > -SCORE_WIN && eval < alpha - 10 * (depth - 1) - 20 &&
                 !(type(mv) & (CAPTURE | PROMOTION)) && mv != prev_best &&
                 popcount(position.color_bb[~position.next] & ~position.type_bb[PAWN]) > 1)
         {
@@ -2134,10 +2134,10 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         if (checkers)
             extension++;
         else if (depth <= 2 && ply < 2 * root_depth && (type(mv) & CAPTURE) && (type(stack[ply].prev_move) & CAPTURE) &&
-                to(mv) == to(stack[ply].prev_move) && eval + material[type(position.squares[to(mv)])].mid > alpha - 30 && eval < beta + 14)
+                to(mv) == to(stack[ply].prev_move) && eval + material[type(position.squares[to(mv)])].mid > alpha - 26 && eval < beta + 10)
             extension++;
         else if (!(type(mv) & CAPTURE) && type(position.squares[from(mv)]) == PAWN && ply < 2 * root_depth &&
-                eval < beta + 44 &&
+                eval < beta + 33 &&
                 (position.next == WHITE ? is_passed_pawn_move<WHITE>(mv) : is_passed_pawn_move<BLACK>(mv)))
             extension++;
         else if (!skip_move && mv == prev_best &&
@@ -2161,12 +2161,12 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         if (new_depth >= 3 && move_count && !checkers && !(type(mv) & (CAPTURE | PROMOTION)) &&
                 mv != prev_best && !stack[ply].is_killer(mv))
         {
-            reduction = move_count - 3;
+            reduction = move_count - 4;
             if (he && !(he->flags & LOWER))
                 reduction += 3;
             if (pv)
                 reduction += 1;
-            reduction -= history[position.next][mv & FROM_TO_MASK].value / 1853;
+            reduction -= history[position.next][mv & FROM_TO_MASK].value / 1855;
             reduction = std::clamp(reduction / 4, 0, depth / 3);
         }
 
@@ -2245,7 +2245,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
             if (stack[ply].prev_move)
                 counter_move = best;
         }
-        int inc = 40 * (depth - 1) + 597;
+        int inc = 45 * (depth - 1) + 686;
         MoveHistory* hist = history[position.next];
         for (int i = gen.index - 1; i >= 0; --i)
         {
@@ -2305,7 +2305,7 @@ void Search::iterate(int max_depth)
         std::fill_n(pawn_eval_cache, PAWN_EVAL_CACHE_SIZE, PawnEvalCache{});
         sel_depth = 0;
 
-        int alpha = root_depth >= 4 && best_score > -SCORE_WIN ? best_score - 300 : -SCORE_MATE;
+        int alpha = root_depth >= 4 && best_score > -SCORE_WIN ? best_score - 288 : -SCORE_MATE;
         auto v = search(true, 0, root_depth, alpha, SCORE_MATE);
 
         if (alpha > -SCORE_MATE && v.first <= alpha && !check_time(changes, improving))

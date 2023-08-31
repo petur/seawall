@@ -1288,7 +1288,7 @@ struct PawnEvalCache
     Score value;
 };
 
-static constexpr int PAWN_EVAL_CACHE_SIZE_BITS = 5;
+static constexpr int PAWN_EVAL_CACHE_SIZE_BITS = 7;
 static constexpr int PAWN_EVAL_CACHE_SIZE = 1 << PAWN_EVAL_CACHE_SIZE_BITS;
 
 static PawnEvalCache pawn_eval_cache[PAWN_EVAL_CACHE_SIZE];

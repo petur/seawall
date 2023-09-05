@@ -1937,7 +1937,7 @@ bool Search::repetition(int ply) const
 {
     std::uint64_t current = stack[ply].key;
     int count = 0;
-    for (int i = 4; i < position.halfmove_clock; i += 2)
+    for (int i = 4; i <= position.halfmove_clock; i += 2)
     {
         if (stack[ply - i].key == current)
         {

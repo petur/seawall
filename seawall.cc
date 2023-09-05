@@ -1501,47 +1501,47 @@ Score king_evals[64][4] =
 #ifndef TUNE
 constexpr
 #endif
-Score piece_evals[8][19] =
+Score piece_evals[8][20] =
 {
     {
         {56, 88}, {48, 67}, {28, -7}, {13, 25}, {12, 0}, {35, 40}, {6, 7}, {3, 21},
-        {8, 56}, {12, 42}, {45, 62}, {8, 44}, {14, -2}, {64, 14}, {60, -8}, {-48, 0},
-        {-4, 37}, {-15, 71}, {11, 122},
+        {8, 56}, {12, 42}, {45, 62}, {8, 44}, {14, -2}, {-1, 55}, {64, 14}, {60, -8},
+        {-48, 0}, {-4, 37}, {-15, 71}, {11, 122},
     },
     {
         {53, 63}, {44, 53}, {25, -16}, {15, 21}, {13, 1}, {36, 20}, {4, 2}, {6, 15},
-        {10, 37}, {12, 33}, {40, 35}, {11, 41}, {-6, 10}, {37, 25}, {72, -25}, {12, -4},
-        {0, -29}, {36, 66}, {25, 10},
+        {10, 37}, {12, 33}, {40, 35}, {11, 41}, {-6, 10}, {10, 36}, {37, 25}, {72, -25},
+        {12, -4}, {0, -29}, {36, 66}, {25, 10},
     },
     {
         {38, 74}, {25, 87}, {50, -27}, {22, 26}, {12, 0}, {53, 16}, {-1, 8}, {32, 2},
-        {28, 29}, {21, 25}, {52, 28}, {12, 34}, {2, 10}, {107, -18}, {47, -13}, {3, 0},
-        {5, -26}, {32, 77}, {10, 46},
+        {28, 29}, {21, 25}, {52, 28}, {12, 34}, {2, 10}, {35, 22}, {107, -18}, {47, -13},
+        {3, 0}, {5, -26}, {32, 77}, {10, 46},
     },
     {
         {42, 73}, {18, 69}, {52, -33}, {16, 22}, {19, -3}, {29, 22}, {-1, 5}, {28, 3},
-        {8, 28}, {19, 24}, {53, 6}, {7, 31}, {4, 12}, {100, -14}, {38, -13}, {21, -2},
-        {-66, -52}, {44, 63}, {-23, -15},
+        {8, 28}, {19, 24}, {53, 6}, {7, 31}, {4, 12}, {29, 11}, {100, -14}, {38, -13},
+        {21, -2}, {-66, -52}, {44, 63}, {-23, -15},
     },
     {
         {44, 72}, {43, 102}, {72, -37}, {15, 9}, {-16, 12}, {20, 6}, {3, 2}, {66, -24},
-        {-3, 22}, {-21, 42}, {19, 24}, {-3, 18}, {-2, 21}, {118, -27}, {9, 13}, {1, 4},
-        {-11, -62}, {-4, 74}, {4, 84},
+        {-3, 22}, {-21, 42}, {19, 24}, {-3, 18}, {-2, 21}, {15, 24}, {118, -27}, {9, 13},
+        {1, 4}, {-11, -62}, {-4, 74}, {4, 84},
     },
     {
         {13, 75}, {36, 119}, {83, -38}, {21, 3}, {1, 4}, {43, 17}, {4, 5}, {56, -13},
-        {-22, 42}, {-15, 47}, {22, 9}, {12, 25}, {5, 21}, {94, -18}, {10, 7}, {11, -2},
-        {-147, -62}, {63, 34}, {32, 24},
+        {-22, 42}, {-15, 47}, {22, 9}, {12, 25}, {5, 21}, {23, 12}, {94, -18}, {10, 7},
+        {11, -2}, {-147, -62}, {63, 34}, {32, 24},
     },
     {
         {46, 146}, {26, 122}, {81, -42}, {25, -10}, {-19, 22}, {-6, -14}, {-25, 16}, {7, -6},
-        {-22, 27}, {-17, 44}, {19, 8}, {4, 19}, {-1, 30}, {80, -18}, {5, 36}, {-4, 3},
-        {9, -54}, {11, 77}, {28, 63},
+        {-22, 27}, {-17, 44}, {19, 8}, {4, 19}, {-1, 30}, {2, 20}, {80, -18}, {5, 36},
+        {-4, 3}, {9, -54}, {11, 77}, {28, 63},
     },
     {
         {12, 75}, {37, 127}, {58, -41}, {9, 8}, {-4, 9}, {34, 11}, {-10, 17}, {14, 10},
-        {-23, 41}, {-42, 53}, {19, 3}, {0, 9}, {5, 23}, {60, -9}, {7, 28}, {7, 8},
-        {-36, -47}, {25, 41}, {0, 16},
+        {-23, 41}, {-42, 53}, {19, 3}, {0, 9}, {5, 23}, {14, 30}, {60, -9}, {7, 28},
+        {7, 8}, {-36, -47}, {25, 41}, {0, 16},
     },
 };
 
@@ -1617,7 +1617,14 @@ Score evaluate_pieces(const Mobility& mobility)
     r += pe[11] * popcount(mobility.attacks2[C] & position.color_bb[~C] & ~position.type_bb[PAWN]);
 
     BitBoard passed_pawns = own_pawns & ~smear<-FWD>(opp_pawns | opp_attack);
-    r += pe[12] * popcount(passed_pawns & ~smear<-FWD>(shift_signed<-FWD>(position.all_bb())));
+    if (passed_pawns)
+    {
+        r += pe[12] * popcount(passed_pawns & ~smear<-FWD>(shift_signed<-FWD>(position.all_bb())));
+
+        constexpr BitBoard LAST_RANKS = static_cast<BitBoard>(C == WHITE ? 0x00ffff0000000000ULL : 0x0000000000ffff00ULL);
+        r += pe[13] * popcount(passed_pawns & LAST_RANKS &
+            ~smear<-FWD>(mobility.attacks[~C][KNIGHT] | mobility.attacks[~C][BISHOP] | mobility.attacks[~C][ROOK] | mobility.attacks[~C][QUEEN]));
+    }
 
     BitBoard guarded = own_attack |
         mobility.attacks[C][KNIGHT] | mobility.attacks[C][BISHOP] | mobility.attacks[C][ROOK] | mobility.attacks[C][QUEEN];
@@ -1626,9 +1633,9 @@ Score evaluate_pieces(const Mobility& mobility)
         (bishop_attack(king_sq, position.all_bb()) & (mobility.attacks[~C][BISHOP] | mobility.attacks[~C][QUEEN])) |
         (rook_attack(king_sq, position.all_bb()) & (mobility.attacks[~C][ROOK] | mobility.attacks[~C][QUEEN]))
     );
-    r -= pe[13] * popcount(safe_checks);
-    r -= pe[14] * popcount(king_attack[king_sq] & mobility.attacks2[~C] & ~guarded);
-    r += pe[15 + !!(position.type_bb[QUEEN] & position.color_bb[C]) + 2 * !!((bishops & LIGHT_SQUARES) && (bishops & DARK_SQUARES))];
+    r -= pe[14] * popcount(safe_checks);
+    r -= pe[15] * popcount(king_attack[king_sq] & mobility.attacks2[~C] & ~guarded);
+    r += pe[16 + !!(position.type_bb[QUEEN] & position.color_bb[C]) + 2 * !!((bishops & LIGHT_SQUARES) && (bishops & DARK_SQUARES))];
 
     return r;
 }
@@ -2702,7 +2709,6 @@ void Tuner::tune()
     double best_error = evaluation_error(0, 1);
     print_error(best_error);
 
-    /*
     variables.push_back({&material[0].end, 0});
     for (int i = 1; i < 5; i++)
         add_variable(material[i]);
@@ -2711,9 +2717,6 @@ void Tuner::tune()
     add_variables(mobility_evals);
     add_variables(king_evals);
     add_variables(piece_evals);
-    */
-    for (int i = 0; i < 8; i++)
-        add_variable(piece_evals[i][12]);
 
     std::size_t step = tuning_positions.size() / 1800000U + 1;
 

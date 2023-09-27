@@ -1974,6 +1974,63 @@ bool Search::repetition(int ply) const
     return false;
 }
 
+std::pair<Square, PieceType> find_best_attacker(Color color, Square sq, BitBoard mask, BitBoard opp_mask)
+{
+    BitBoard pawns = mask & position.type_bb[PAWN] & pawn_attack[~color][sq];
+    if (pawns)
+        return {first_square(pawns), PAWN};
+    BitBoard knights = mask & position.type_bb[KNIGHT] & knight_attack[sq];
+    if (knights)
+        return {first_square(knights), KNIGHT};
+    BitBoard bishops = mask & position.type_bb[BISHOP] & bishop_attack(sq, mask | opp_mask);
+    if (bishops)
+        return {first_square(bishops), BISHOP};
+    BitBoard rooks = mask & position.type_bb[ROOK] & rook_attack(sq, mask | opp_mask);
+    if (rooks)
+        return {first_square(rooks), ROOK};
+    BitBoard queens = mask & position.type_bb[QUEEN] & queen_attack(sq, mask | opp_mask);
+    if (queens)
+        return {first_square(queens), QUEEN};
+    BitBoard kings = mask & position.type_bb[KING] & king_attack[sq];
+    if (kings)
+        return {first_square(kings), KING};
+    return {NO_SQUARE, KING};
+}
+
+bool see_under(Move mv, int limit)
+{
+    Square sq = to(mv);
+    int balance = material[type(position.squares[sq])].mid;
+
+    Color att = position.next;
+    BitBoard def_mask = position.color_bb[~att];
+    BitBoard att_mask = position.color_bb[att] & ~from(mv);
+    PieceType current = type(position.squares[from(mv)]);
+
+    for (;;)
+    {
+        auto def_move = find_best_attacker(~att, sq, def_mask, att_mask);
+        if (def_move.first == NO_SQUARE)
+            break;
+        balance -= material[current].mid;
+        if (balance >= limit)
+            return false;
+        current = def_move.second;
+        def_mask &= ~bb(def_move.first);
+
+        auto att_move = find_best_attacker(att, sq, att_mask, def_mask);
+        if (att_move.first == NO_SQUARE)
+            break;
+        balance += material[current].mid;
+        if (balance <= limit)
+            return true;
+        current = att_move.second;
+        att_mask &= ~bb(att_move.first);
+    }
+
+    return balance <= limit;
+}
+
 int Search::qsearch(int ply, int depth, int alpha, int beta)
 {
     assert(ply < 128);
@@ -2013,9 +2070,7 @@ int Search::qsearch(int ply, int depth, int alpha, int beta)
         if (!checkers && !(type(mv) & PROMOTION) && pat + material[type(position.squares[to(mv)])].mid < alpha - 101)
             continue;
 
-        if (!checkers && !(type(mv) & PROMOTION) && mv != best &&
-                (pawn_attack[position.next][to(mv)] & position.type_bb[PAWN] & position.color_bb[~position.next]) &&
-                material[type(position.squares[from(mv)])].mid > material[type(position.squares[to(mv)])].mid + 137)
+        if (!checkers && !(type(mv) & PROMOTION) && mv != best && see_under(mv, -137))
             continue;
 
         ++nodes;

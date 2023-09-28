@@ -2209,6 +2209,9 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         if (!checkers && !checks && move_count && depth <= 2 && !(type(mv) & (CAPTURE | PROMOTION)) && eval < beta - 160 * (depth - 1) + 147 &&
                 see_under(mv, -137))
             continue;
+        if (!checkers && !checks && move_count && depth <= 1 && (type(mv) & CAPTURE) && !(type(mv) & PROMOTION) &&
+                eval < beta + 50 && see_under(mv, -137))
+            continue;
 
         if (!checkers && !checks && depth <= 7 && alpha > -SCORE_WIN && eval < alpha - 10 * (depth - 1) - 20 &&
                 !(type(mv) & (CAPTURE | PROMOTION)) && mv != prev_best &&

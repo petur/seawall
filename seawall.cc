@@ -2000,7 +2000,7 @@ std::pair<Square, PieceType> find_best_attacker(Color color, Square sq, BitBoard
 bool see_under(Move mv, int limit)
 {
     Square sq = to(mv);
-    int balance = material[type(position.squares[sq])].mid;
+    int balance = (type(mv) & CAPTURE) ? material[type(position.squares[sq])].mid : 0;
 
     Color att = position.next;
     BitBoard def_mask = position.color_bb[~att];
@@ -2206,9 +2206,8 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         if (!checkers && !checks && move_count && depth <= 1 && (type(mv) & CAPTURE) && !(type(mv) & PROMOTION) &&
                 eval + material[type(position.squares[to(mv)])].mid < alpha - 55)
             continue;
-        if (!checkers && !checks && move_count && depth <= 2 && !(type(mv) & (CAPTURE | PROMOTION)) && eval < beta - 200 * (depth - 1) + 147 &&
-                (pawn_attack[position.next][to(mv)] & position.type_bb[PAWN] & position.color_bb[~position.next]) &&
-                type(position.squares[from(mv)]) != PAWN)
+        if (!checkers && !checks && move_count && depth <= 2 && !(type(mv) & (CAPTURE | PROMOTION)) && eval < beta - 160 * (depth - 1) + 147 &&
+                see_under(mv, -137))
             continue;
 
         if (!checkers && !checks && depth <= 7 && alpha > -SCORE_WIN && eval < alpha - 10 * (depth - 1) - 20 &&

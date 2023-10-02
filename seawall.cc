@@ -2067,7 +2067,7 @@ int Search::qsearch(int ply, int depth, int alpha, int beta)
         if (is_stopped())
             return alpha;
 
-        if (!checkers && !(type(mv) & PROMOTION) && pat + material[type(position.squares[to(mv)])].mid < alpha - 101)
+        if (!checkers && !(type(mv) & PROMOTION) && pat + material[type(position.squares[to(mv)])].mid < alpha - 107)
             continue;
 
         if (!checkers && !(type(mv) & PROMOTION) && mv != best && see_under(mv, -137))
@@ -2150,7 +2150,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     if (he && ((hv > eval && (he->flags & LOWER)) || (hv < eval && (he->flags & UPPER))))
         eval = hv;
 
-    if (!pv && !checkers && depth <= 3 && eval > beta + 192 * (depth - 1) + 41 &&
+    if (!pv && !checkers && depth <= 3 && eval > beta + 187 * (depth - 1) + 44 &&
             (position.color_bb[position.next] & ~position.type_bb[KING]))
         return {beta, NULL_MOVE};
 
@@ -2164,7 +2164,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
             !stack[ply].in_nmp &&
             !stack[ply - 1].in_nmp &&
             depth >= 4 &&
-            eval > beta + 86 &&
+            eval > beta + 91 &&
             !checkers &&
             alpha > -SCORE_WIN &&
             popcount(position.color_bb[position.next] & ~position.type_bb[PAWN]) > 1)
@@ -2172,7 +2172,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         stack[ply].in_nmp = true;
         Memo memo = do_move(ply, NULL_MOVE);
 
-        int v = -search(false, ply + 1, depth - (13 * (eval - beta) + 331 * (depth - 1) + 3428) / 2048, -beta, -beta + 1).first;
+        int v = -search(false, ply + 1, depth - (13 * (eval - beta) + 340 * (depth - 1) + 3458) / 2048, -beta, -beta + 1).first;
         undo_move(NULL_MOVE, memo);
         if (v >= beta)
             v = search(false, ply, (depth - 1) / 2, beta - 1, beta).first;
@@ -2182,7 +2182,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     }
 
     if (!he && !checkers && eval > alpha)
-        depth = std::max(1, depth - 1 - (eval > beta + 195));
+        depth = std::max(1, depth - 1 - (eval > beta + 191));
 
     Move& counter_move = counter_moves[counter_index(stack[ply].prev_move)];
     MoveGen gen{QUIETS, checkers, prev_best, counter_move, stack[ply]};
@@ -2201,19 +2201,19 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
             continue;
         }
         bool checks = is_check(mv, opp_king_sq);
-        if (!checkers && !checks && move_count && depth <= 5 && eval < alpha - (209 * (depth - 1) + 55) && !(type(mv) & (CAPTURE | PROMOTION)))
+        if (!checkers && !checks && move_count && depth <= 5 && eval < alpha - (210 * (depth - 1) + 61) && !(type(mv) & (CAPTURE | PROMOTION)))
             continue;
         if (!checkers && !checks && move_count && depth <= 1 && (type(mv) & CAPTURE) && !(type(mv) & PROMOTION) &&
-                eval + material[type(position.squares[to(mv)])].mid < alpha - 55)
+                eval + material[type(position.squares[to(mv)])].mid < alpha - 62)
             continue;
-        if (!checkers && !checks && move_count && depth <= 2 && !(type(mv) & (CAPTURE | PROMOTION)) && eval < beta - 160 * (depth - 1) + 147 &&
+        if (!checkers && !checks && move_count && depth <= 2 && !(type(mv) & (CAPTURE | PROMOTION)) && eval < beta - 165 * (depth - 1) + 151 &&
                 see_under(mv, -137))
             continue;
         if (!checkers && !checks && move_count && depth <= 1 && (type(mv) & CAPTURE) && !(type(mv) & PROMOTION) &&
-                eval < beta + 50 && see_under(mv, -137))
+                eval < beta + 51 && see_under(mv, -137))
             continue;
 
-        if (!checkers && !checks && depth <= 7 && alpha > -SCORE_WIN && eval < alpha - 10 * (depth - 1) - 20 &&
+        if (!checkers && !checks && depth <= 7 && alpha > -SCORE_WIN && eval < alpha  - 22 &&
                 !(type(mv) & (CAPTURE | PROMOTION)) && mv != prev_best &&
                 popcount(position.color_bb[~position.next] & ~position.type_bb[PAWN]) > 1)
         {
@@ -2226,10 +2226,10 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         if (checkers)
             extension++;
         else if (depth <= 2 && ply < 2 * root_depth && (type(mv) & CAPTURE) && (type(stack[ply].prev_move) & CAPTURE) &&
-                to(mv) == to(stack[ply].prev_move) && eval + material[type(position.squares[to(mv)])].mid > alpha - 26 && eval < beta + 10)
+                to(mv) == to(stack[ply].prev_move) && eval + material[type(position.squares[to(mv)])].mid > alpha - 28 && eval < beta + 9)
             extension++;
         else if (!(type(mv) & CAPTURE) && type(position.squares[from(mv)]) == PAWN && ply < 2 * root_depth &&
-                eval < beta + 33 &&
+                eval < beta + 27 &&
                 (position.next == WHITE ? is_passed_pawn_move<WHITE>(mv) : is_passed_pawn_move<BLACK>(mv)))
             extension++;
         else if (!skip_move && mv == prev_best &&
@@ -2255,11 +2255,11 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         {
             reduction = move_count - 4;
             if (he && !(he->flags & LOWER))
-                reduction += 3;
+                reduction += 4;
             if (pv)
                 reduction += 1;
-            reduction -= history[position.next][mv & FROM_TO_MASK].value / 1855;
-            reduction = std::clamp(reduction / 4, 0, depth / 3 + (depth * move_count >= 91));
+            reduction -= history[position.next][mv & FROM_TO_MASK].value / 1858;
+            reduction = std::clamp(reduction / 4, 0, depth / 3 + (depth * move_count >= 93));
         }
 
         ++nodes;

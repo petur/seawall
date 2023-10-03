@@ -2212,6 +2212,9 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         if (!checkers && !checks && move_count && depth <= 1 && (type(mv) & CAPTURE) && !(type(mv) & PROMOTION) &&
                 eval < beta + 51 && see_under(mv, -137))
             continue;
+        if (!checkers && !checks && move_count && depth <= 1 && !(type(mv) & (CAPTURE | PROMOTION)) && eval < alpha - 50 &&
+                history[position.next][mv & FROM_TO_MASK].value < -6000)
+            continue;
 
         if (!checkers && !checks && depth <= 7 && alpha > -SCORE_WIN && eval < alpha  - 22 &&
                 !(type(mv) & (CAPTURE | PROMOTION)) && mv != prev_best &&

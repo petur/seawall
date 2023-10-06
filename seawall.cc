@@ -2233,7 +2233,8 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
             extension++;
         else if (!(type(mv) & CAPTURE) && type(position.squares[from(mv)]) == PAWN && ply < 2 * root_depth &&
                 eval < beta + 27 &&
-                (position.next == WHITE ? is_passed_pawn_move<WHITE>(mv) : is_passed_pawn_move<BLACK>(mv)))
+                (position.next == WHITE ? is_passed_pawn_move<WHITE>(mv) : is_passed_pawn_move<BLACK>(mv)) &&
+                !see_under(mv, -50))
             extension++;
         else if (!skip_move && mv == prev_best &&
                 he && (he->flags & LOWER) && he->value >= -SCORE_WIN &&

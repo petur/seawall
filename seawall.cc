@@ -2206,10 +2206,10 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         if (!checkers && !checks && move_count && depth <= 1 && (type(mv) & CAPTURE) && !(type(mv) & PROMOTION) &&
                 eval + material[type(position.squares[to(mv)])].mid < alpha - 62)
             continue;
-        if (!checkers && !checks && move_count && depth <= 2 && !(type(mv) & (CAPTURE | PROMOTION)) && eval < beta - 165 * (depth - 1) + 151 &&
+        if (!checkers && move_count && depth <= 2 && !(type(mv) & (CAPTURE | PROMOTION)) && eval < beta - 165 * (depth - 1) + 151 &&
                 see_under(mv, -137))
             continue;
-        if (!checkers && !checks && move_count && depth <= 1 && (type(mv) & CAPTURE) && !(type(mv) & PROMOTION) &&
+        if (!checkers && move_count && depth <= 1 && (type(mv) & CAPTURE) && !(type(mv) & PROMOTION) &&
                 eval < beta + 51 && see_under(mv, -137))
             continue;
         if (!checkers && !checks && move_count && depth <= 1 && !(type(mv) & (CAPTURE | PROMOTION)) && eval < alpha - 50 &&

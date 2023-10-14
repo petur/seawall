@@ -1668,14 +1668,32 @@ Score evaluate_pieces(const Mobility& mobility)
 constexpr int SCORE_MATE = 32767;
 constexpr int SCORE_WIN = 32000;
 
+struct alignas(4) EvalCache
+{
+    std::uint16_t key;
+    std::int16_t value;
+};
+
+constexpr int EVAL_CACHE_SIZE = 1 << 12;
+constexpr std::uint64_t EVAL_CACHE_MASK = EVAL_CACHE_SIZE - 1;
+alignas(64) static EvalCache eval_cache[EVAL_CACHE_SIZE];
+
 int evaluate(int alpha = -SCORE_WIN, int beta = SCORE_WIN)
 {
+    std::uint64_t hash_key = position.hash();
+    std::uint16_t eval_key = hash_key >> 48;
+    auto& ec = eval_cache[hash_key & EVAL_CACHE_MASK];
+    if (ec.key == eval_key)
+        return ec.value;
+
     Score lazy_eval = position.piece_square_values[position.next] - position.piece_square_values[~position.next];
     Score eval{};
 
     constexpr int lazy_threshold = 296;
-    if ((lazy_eval.mid > alpha - lazy_threshold && lazy_eval.mid < beta + lazy_threshold) ||
-            (lazy_eval.end > alpha - lazy_threshold && lazy_eval.end < beta + lazy_threshold))
+    bool lazy = (lazy_eval.mid <= alpha - lazy_threshold || lazy_eval.mid >= beta + lazy_threshold) &&
+            (lazy_eval.end <= alpha - lazy_threshold || lazy_eval.end >= beta + lazy_threshold);
+
+    if (!lazy)
     {
         int pawn_index = static_cast<int>((position.type_bb[PAWN] * 0x496ea34db5092c93ULL) >> (64 - PAWN_EVAL_CACHE_SIZE_BITS));
 
@@ -1704,9 +1722,14 @@ int evaluate(int alpha = -SCORE_WIN, int beta = SCORE_WIN)
     int pieces = popcount(position.all_bb()) + popcount(position.all_bb() & ~position.type_bb[PAWN]) - 2;
     int v = (MIDGAME_WEIGHT * pieces * result.mid + ENDGAME_WEIGHT * (48 - pieces) * result.end) / 1920;
     if (!position.type_bb[PAWN])
-        return evaluate_pawnless(v);
+        v = evaluate_pawnless(v);
     else if (popcount(position.all_bb()) <= 5 && popcount(position.type_bb[PAWN]) == 1)
-        return (position.type_bb[PAWN] & position.color_bb[WHITE]) ? evaluate_single_pawn<WHITE>(v) : evaluate_single_pawn<BLACK>(v);
+        v = (position.type_bb[PAWN] & position.color_bb[WHITE]) ? evaluate_single_pawn<WHITE>(v) : evaluate_single_pawn<BLACK>(v);
+    if (!lazy)
+    {
+        ec.key = eval_key;
+        ec.value = v;
+    }
     return v;
 }
 
@@ -2515,6 +2538,7 @@ void uci_main()
             if (hash_table)
                 std::fill_n(hash_table, hash_size, HashEntry{});
             hash_generation = 0;
+            std::fill_n(eval_cache, EVAL_CACHE_SIZE, EvalCache{});
             for (Color c : {WHITE, BLACK})
                 std::fill_n(history[c], FROM_TO_SIZE, MoveHistory{});
             for (int c = PAWN; c < KING; c++)

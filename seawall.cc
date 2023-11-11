@@ -162,8 +162,8 @@ constexpr std::uint64_t color_hash_values[2] =
 
 enum Color : std::uint8_t { WHITE, BLACK };
 
-inline Color operator~(Color c) { return static_cast<Color>(c ^ 1); }
-inline int rank_fwd(Color c) { return c == WHITE ? 8 : -8; }
+constexpr inline Color operator~(Color c) { return static_cast<Color>(c ^ 1); }
+constexpr inline int rank_fwd(Color c) { return c == WHITE ? 8 : -8; }
 
 enum PieceType : std::uint8_t { PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING };
 
@@ -174,9 +174,9 @@ enum Piece : std::uint8_t
     BPAWN = 1 << 4, BKNIGHT, BBISHOP, BROOK, BQUEEN, BKING,
 };
 
-inline Color color(Piece p) { return static_cast<Color>(p >> 4); }
-inline PieceType type(Piece p) { return static_cast<PieceType>(p & 7); }
-inline Piece piece(Color c, PieceType t) { return static_cast<Piece>((c == WHITE ? 1 << 3 : 1 << 4) | t); }
+constexpr inline Color color(Piece p) { return static_cast<Color>(p >> 4); }
+constexpr inline PieceType type(Piece p) { return static_cast<PieceType>(p & 7); }
+constexpr inline Piece piece(Color c, PieceType t) { return static_cast<Piece>((c == WHITE ? 1 << 3 : 1 << 4) | t); }
 
 enum Castling : std::uint8_t { WQ = 1 << 0, WK = 1 << 1, BQ = 1 << 2, BK = 1 << 3 };
 
@@ -1969,6 +1969,91 @@ Score king_relative_knight_psqt[16][64] =
     },
 };
 
+alignas(64)
+#ifndef TUNE
+constexpr
+#endif
+Score king_relative_opp_pawn_psqt[8][48] =
+{
+    {
+        {12, 36}, {5, 35}, {-5, 20}, {-8, -16}, {-12, -18}, {-2, -38}, {3, -39}, {21, -33},
+        {-6, 20}, {-19, 2}, {-19, 14}, {-5, 1}, {7, -25}, {9, -33}, {10, -20}, {10, -25},
+        {-3, 11}, {8, 3}, {-5, 5}, {-2, 0}, {-2, 2}, {2, -10}, {0, -8}, {1, -10},
+        {2, 6}, {3, 4}, {-1, 1}, {0, 0}, {-2, 2}, {-2, -1}, {-2, -5}, {-2, -5},
+        {2, 1}, {3, 0}, {0, -4}, {-1, -3}, {-2, 1}, {-3, 0}, {-5, -4}, {-4, -2},
+        {1, 6}, {1, 1}, {1, -4}, {-2, -2}, {-3, -4}, {-4, 1}, {-4, -1}, {-2, -1},
+    },
+    {
+        {-4, 25}, {4, 19}, {-2, 36}, {-5, 28}, {-4, 2}, {8, 1}, {2, -35}, {18, -53},
+        {-12, 22}, {-16, 32}, {-21, 15}, {-11, 6}, {-11, 23}, {4, -2}, {5, -11}, {5, -23},
+        {-6, 5}, {-10, 3}, {-7, 5}, {1, -5}, {-1, 0}, {0, 1}, {-4, -2}, {0, -8},
+        {-4, 4}, {-6, 3}, {0, 2}, {1, -1}, {-3, 0}, {-1, 2}, {-3, -2}, {-2, -4},
+        {-1, 1}, {-3, 2}, {1, 1}, {1, 1}, {-2, 1}, {-2, 0}, {-4, 2}, {-2, 0},
+        {-1, -3}, {-1, 1}, {3, 0}, {1, 6}, {0, 0}, {-3, 2}, {-2, 1}, {-2, -2},
+    },
+    {
+        {9, 45}, {10, 41}, {0, 63}, {-7, 10}, {-14, 10}, {-10, -1}, {-2, -5}, {-2, -1},
+        {-19, 57}, {-20, 49}, {-13, 42}, {-1, 24}, {-9, -8}, {-1, -20}, {-15, -13}, {-7, -3},
+        {-5, 5}, {-8, 0}, {1, 7}, {0, 14}, {1, -1}, {10, -8}, {0, -10}, {6, -8},
+        {-1, -3}, {-6, -10}, {3, 1}, {1, 1}, {4, 2}, {-3, -1}, {6, -4}, {0, -1},
+        {-5, -1}, {0, -4}, {-6, 2}, {-1, -2}, {3, 3}, {2, 3}, {3, 2}, {-2, 5},
+        {-17, 3}, {-3, -1}, {0, -3}, {1, -1}, {-4, 5}, {-4, 8}, {1, 5}, {0, 5},
+    },
+    {
+        {-2, 23}, {7, 39}, {-1, 62}, {-2, 46}, {-2, 30}, {-7, 12}, {-4, -5}, {-2, 0},
+        {-20, 39}, {-18, 53}, {-15, 31}, {0, 27}, {-7, 28}, {2, 19}, {-4, 5}, {-9, -9},
+        {-10, 17}, {-3, 9}, {-2, 0}, {-3, -4}, {9, 4}, {11, 4}, {4, -1}, {6, -8},
+        {4, -2}, {-6, -1}, {0, -10}, {3, -14}, {0, -5}, {-1, -2}, {4, -2}, {2, -6},
+        {0, -2}, {-2, -2}, {-1, -3}, {0, -3}, {-2, -1}, {1, 1}, {1, 1}, {-1, 0},
+        {-15, 1}, {1, 1}, {1, 0}, {-2, -1}, {-3, 2}, {-2, 6}, {1, 2}, {-1, -2},
+    },
+    {
+        {1, -2}, {-12, -1}, {-2, -6}, {-4, -9}, {-5, -11}, {-14, -8}, {-11, -4}, {-12, 10},
+        {-1, 12}, {4, 17}, {-1, -3}, {-2, -30}, {-3, -32}, {-16, -32}, {-12, -18}, {-14, -18},
+        {5, 9}, {2, 19}, {7, 8}, {7, 8}, {-1, -9}, {1, -20}, {0, -20}, {-2, -15},
+        {-8, 1}, {-2, 8}, {2, 13}, {7, 11}, {2, 8}, {-2, -1}, {1, 1}, {-1, -5},
+        {-6, -6}, {-5, -4}, {4, 4}, {3, 11}, {-6, 20}, {1, 13}, {-5, 9}, {0, 9},
+        {-6, -14}, {-8, -11}, {-8, -6}, {-1, 3}, {5, 9}, {-3, 14}, {-5, 11}, {-15, 14},
+    },
+    {
+        {1, 2}, {-16, 1}, {-5, -8}, {-8, -14}, {2, -4}, {-10, -5}, {-9, 1}, {-15, 2},
+        {-6, 9}, {3, 15}, {1, -1}, {3, -23}, {2, -15}, {-10, -20}, {-7, -15}, {-4, -14},
+        {2, 7}, {0, 13}, {8, 10}, {6, 3}, {-1, 0}, {10, -6}, {4, -9}, {-3, -14},
+        {-1, 7}, {-1, 11}, {1, 4}, {5, 8}, {-2, 5}, {1, 2}, {0, 8}, {-3, -1},
+        {-1, 7}, {-3, -1}, {-4, -8}, {-4, -4}, {-6, 1}, {-2, 9}, {-6, 10}, {-2, 6},
+        {-3, -8}, {-9, -10}, {-8, -10}, {-4, -4}, {1, -2}, {-7, 1}, {-9, 6}, {-19, 7},
+    },
+    {
+        {-3, -18}, {-11, -9}, {-2, -10}, {-8, -20}, {-10, -30}, {-14, -8}, {-8, -5}, {-13, -14},
+        {-14, 0}, {-5, -1}, {-7, -14}, {-6, -35}, {1, -35}, {-15, -54}, {-13, -21}, {0, -25},
+        {-2, 12}, {-1, 13}, {-1, 1}, {-5, -13}, {-2, -19}, {2, -30}, {1, -17}, {0, -15},
+        {-4, 2}, {-4, 11}, {4, 6}, {-1, -5}, {4, 15}, {-1, 1}, {-3, 8}, {1, 0},
+        {-11, -5}, {-8, -4}, {-3, 2}, {-9, 0}, {-1, 12}, {3, 12}, {2, 12}, {-2, 11},
+        {-1, 2}, {-6, -10}, {0, 0}, {-4, -6}, {7, 1}, {-1, 8}, {-4, 15}, {-13, 14},
+    },
+    {
+        {0, -13}, {-10, -3}, {-2, -14}, {-8, -19}, {-9, -26}, {-13, -6}, {-8, -3}, {-12, -10},
+        {-13, 1}, {-1, -2}, {-9, -14}, {-4, -33}, {4, -32}, {-12, -49}, {-10, -20}, {-2, -23},
+        {-1, 7}, {4, 14}, {1, 3}, {-3, -12}, {-2, -16}, {3, -25}, {-1, -19}, {1, -16},
+        {-5, 5}, {-3, 11}, {3, 9}, {2, -1}, {1, 11}, {-3, -1}, {-1, 9}, {0, -1},
+        {-8, 3}, {-8, -4}, {-2, 6}, {-8, -3}, {-5, 4}, {2, 10}, {1, 16}, {-2, 12},
+        {-1, 4}, {-8, -10}, {0, -5}, {-6, -7}, {0, -5}, {-4, 1}, {-4, 13}, {-10, 18},
+    },
+};
+
+template<Color C, PieceType Type, unsigned Offset = 0>
+Score evaluate_king_relative(const Score* psqt, unsigned flip)
+{
+    Score r{0, 0};
+    BitBoard pieces = position.type_bb[Type] & position.color_bb[C];
+    while (pieces)
+    {
+        Square sq = pop(pieces);
+        r += psqt[(sq ^ flip) - Offset];
+    }
+    return r;
+}
+
 template<Color C>
 Score evaluate_king_relative()
 {
@@ -1979,21 +2064,9 @@ Score evaluate_king_relative()
     unsigned king_idx = ((rel_king_sq & 48) >> 2) | (rel_king_sq & 3);
 
     Score r{0, 0};
-
-    BitBoard pawns = position.type_bb[PAWN] & position.color_bb[C];
-    while (pawns)
-    {
-        Square sq = pop(pawns);
-        r += king_relative_pawn_psqt[king_idx][(sq ^ flip) - 8];
-    }
-
-    BitBoard knights = position.type_bb[KNIGHT] & position.color_bb[C];
-    while (knights)
-    {
-        Square sq = pop(knights);
-        r += king_relative_knight_psqt[king_idx][sq ^ flip];
-    }
-
+    r += evaluate_king_relative<C, PAWN, 8>(king_relative_pawn_psqt[king_idx], flip);
+    r += evaluate_king_relative<C, KNIGHT>(king_relative_knight_psqt[king_idx], flip);
+    r += evaluate_king_relative<~C, PAWN, 8>(king_relative_opp_pawn_psqt[king_idx / 2], flip);
     return r;
 }
 
@@ -3162,11 +3235,10 @@ void Tuner::tune()
     add_variables(mobility_evals);
     add_variables(king_evals);
     add_variables(piece_evals);
-    */
     add_variables(king_relative_pawn_psqt);
-    /*
     add_variables(king_relative_knight_psqt);
     */
+    add_variables(king_relative_opp_pawn_psqt);
 
     std::size_t step = tuning_positions.size() / 1800000U + 1;
 
@@ -3194,7 +3266,7 @@ void Tuner::tune()
                 [](const TuneVariable& lhs, const TuneVariable& rhs) { return lhs.improvement > rhs.improvement; }
             );
 
-            double cutoff = variables.front().improvement * std::pow(2., -0.4 * n - 1.);
+            double cutoff = variables.front().improvement * std::pow(2., -0.35 * n - 1.);
             for (auto& v : variables)
             {
                 if (v.improvement <= cutoff)
@@ -3213,6 +3285,7 @@ void Tuner::tune()
     print_variables("piece_evals", piece_evals);
     print_variables("king_relative_pawn_psqt", king_relative_pawn_psqt);
     print_variables("king_relative_knight_psqt", king_relative_knight_psqt);
+    print_variables("king_relative_opp_pawn_psqt", king_relative_opp_pawn_psqt);
 }
 #endif
 

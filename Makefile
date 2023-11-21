@@ -3,7 +3,8 @@
 ifeq ($(ARCH),)
 ARCH := native
 endif
-CXXFLAGS += -Wall -Wextra -Werror -std=c++17 -Ofast -march=$(ARCH) -mtune=$(ARCH) -flto -fno-rtti -fno-exceptions $(PGOFLAGS)
+RTTIFLAGS = -fno-rtti -fno-exceptions
+CXXFLAGS += -Wall -Wextra -Werror -std=c++17 -Ofast -march=$(ARCH) -mtune=$(ARCH) -flto $(RTTIFLAGS) $(PGOFLAGS)
 
 version :=
 ifeq ($(version),)
@@ -63,8 +64,10 @@ tune:	seawall.tune
 	cat samples/*.csv | ./seawall.tune
 
 seawall.tune:	CPPFLAGS += -DTUNE=1
+seawall.tune:	RTTIFLAGS =
+seawall.tune:	LDLIBS += -ltbb
 seawall.tune:	seawall.cc
-	$(LINK.cc) $^ -o $@
+	$(LINK.cc) $^ $(LDLIBS) -o $@
 
 clean:
 	$(RM) -r seawall seawall.tune profile

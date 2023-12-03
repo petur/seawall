@@ -1447,6 +1447,14 @@ int evaluate_pawnless(const Position& pos, int v)
         v += king_value / 8;
         v += 1;
     }
+    else if ((!(pos.color_bb[WHITE] & ~pos.type_bb[KING]) || !(pos.color_bb[BLACK] & ~pos.type_bb[KING])) &&
+            (pos.type_bb[QUEEN] || pos.type_bb[ROOK]))
+    {
+        v = material[QUEEN].end + popcount(pos.type_bb[ROOK]) * material[ROOK].end + popcount(pos.type_bb[QUEEN]) * material[QUEEN].end;
+        if (!(pos.color_bb[pos.next] & ~pos.type_bb[KING]))
+            v = -v;
+        v += king_value + 16;
+    }
     else
     {
         if (std::abs(v) < material[PAWN].end)

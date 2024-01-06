@@ -3573,7 +3573,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
             if (stack[ply].prev_move)
                 counter_move = best;
         }
-        int inc = 45 * (depth - 1) + 686;
+        int inc = 45 * (depth - 1) + 686 - std::clamp(eval - beta - 50, 0, 600);
         MoveHistory* hist = history[position.next];
         for (int i = gen.index - 1; i >= 0; --i)
         {

@@ -6,4 +6,5 @@ out/
 branches/
 books/
 samples/
+filtered/
 c-chess-cli.*.log

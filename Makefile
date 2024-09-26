@@ -6,7 +6,7 @@ endif
 RTTIFLAGS = -fno-rtti -fno-exceptions
 CXXFLAGS += -Wall -Wextra -Werror -std=c++17 -Ofast -march=$(ARCH) -mtune=$(ARCH) -flto $(RTTIFLAGS) $(PGOFLAGS)
 
-version :=
+version := 20240926
 ifeq ($(version),)
 version := $(shell date '+%Y%m%d')
 commit := $(shell git rev-parse --short HEAD)

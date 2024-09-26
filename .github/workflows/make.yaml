@@ -46,13 +46,13 @@ jobs:
           mingw-w64-clang-x86_64-compiler-rt
           mingw-w64-clang-x86_64-lld
       if: ${{ matrix.platform.runner == 'windows-latest' }}
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - id: make
       run: |
         make CXX=${{ matrix.platform.cxx }} LLVM_PROFDATA=${{ matrix.platform.llvm_profdata }} \
           ARCH=${{ matrix.platform.arch }} LDFLAGS='-static -s' SUFFIX=${{ matrix.platform.suffix }}
         echo "artifact=$(basename -s .exe out/seawall-*)" >> $GITHUB_OUTPUT
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       with:
         name: ${{ steps.make.outputs.artifact }}
         path: out/seawall-*

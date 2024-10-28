@@ -3625,7 +3625,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     if (he)
     {
         hv = he->get_value(ply);
-        if (he->depth >= depth + pv && position.halfmove_clock < 90)
+        if (he->depth >= depth && position.halfmove_clock < 90)
         {
             if (hv >= beta && (he->flags & LOWER) && hv < SCORE_MATE - ply)
                 return {beta, he->best_move};

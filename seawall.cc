@@ -3275,6 +3275,7 @@ HashEntry* load_hash(Move skip_move)
     if (e->key != static_cast<uint16_t>(hk >> 48) ||
             (e->best_move && !(position.color_bb[position.next] & from(e->best_move))))
         return nullptr;
+    e->flags = static_cast<HashFlags>(hash_generation | (e->flags & ~GEN_MASK));
     return e;
 }
 

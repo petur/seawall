@@ -3745,7 +3745,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
             if (pv)
                 reduction += 1;
             reduction -= history[position.next][mv & FROM_TO_MASK].value / 1858;
-            reduction = std::clamp(reduction / 4, 0, depth / 3 + (depth * move_count >= 93));
+            reduction = std::clamp(reduction / 4, 0, 2 * depth / 5 + (depth * move_count >= 93));
         }
 
         ++nodes;

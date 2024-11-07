@@ -3736,16 +3736,22 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         int new_depth = depth + extension - 1;
 
         int reduction = 0;
-        if (new_depth >= 3 && move_count && !checkers && !(type(mv) & (CAPTURE | PROMOTION)) &&
-                mv != prev_best && !stack[ply].is_killer(mv))
+        if (new_depth >= 3 && move_count && !checkers && mv != prev_best && !(type(mv) & PROMOTION))
         {
-            reduction = move_count - 4;
-            if (he.flags && !(he.flags & LOWER))
-                reduction += 4;
-            if (pv)
-                reduction += 1;
-            reduction -= history[position.next][mv & FROM_TO_MASK].value / 1858;
-            reduction = std::clamp(reduction / 4, 0, 2 * depth / 5 + (depth * move_count >= 93));
+            if (!(type(mv) & CAPTURE) && !stack[ply].is_killer(mv))
+            {
+                reduction = move_count - 4;
+                if (he.flags && !(he.flags & LOWER))
+                    reduction += 4;
+                if (pv)
+                    reduction += 1;
+                reduction -= history[position.next][mv & FROM_TO_MASK].value / 1858;
+                reduction = std::clamp(reduction / 4, 0, 2 * depth / 5 + (depth * move_count >= 93));
+            }
+            else if (see_under(mv, -137))
+            {
+                reduction = 1;
+            }
         }
 
         ++nodes;

@@ -3623,6 +3623,8 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
             return {beta, he.best_move};
         if (hv <= alpha && (he.flags & UPPER) && hv > -SCORE_MATE + ply)
             return {alpha, he.best_move};
+        if (depth <= 3 && depth < he.depth && (he.flags & (LOWER | UPPER)) == (LOWER | UPPER) && hv > -SCORE_MATE + ply && hv < SCORE_MATE - ply)
+            return {hv, he.best_move};
     }
     Move prev_best = he.best_move;
 

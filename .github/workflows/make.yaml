@@ -13,24 +13,28 @@ jobs:
           cxx: g++
           llvm_profdata: ''
           arch: nehalem
+          extra: ''
         - runner: ubuntu-24.04
           shell: 'bash'
           suffix: -linux-gcc
           cxx: g++
           llvm_profdata: ''
           arch: haswell
+          extra: ''
         - runner: ubuntu-24.04
           shell: 'bash'
           suffix: -linux-clang
           cxx: clang++-18
           llvm_profdata: llvm-profdata-18
           arch: haswell
+          extra: '-DNDEBUG'
         - runner: windows-latest
           shell: 'msys2 {0}'
           suffix: -windows-clang
           cxx: clang++
           llvm_profdata: llvm-profdata
           arch: haswell
+          extra: '-DNDEBUG'
     defaults:
       run:
         shell: ${{ matrix.platform.shell }}
@@ -50,7 +54,8 @@ jobs:
     - id: make
       run: |
         make CXX=${{ matrix.platform.cxx }} LLVM_PROFDATA=${{ matrix.platform.llvm_profdata }} \
-          ARCH=${{ matrix.platform.arch }} LDFLAGS='-static -s' SUFFIX=${{ matrix.platform.suffix }}
+          ARCH=${{ matrix.platform.arch }} EXTRA_CPPFLAGS='${{ matrix.platform.extra }}' \
+          LDFLAGS='-static -s' SUFFIX=${{ matrix.platform.suffix }}
         echo "artifact=$(basename -s .exe out/seawall-*)" >> $GITHUB_OUTPUT
     - uses: actions/upload-artifact@v4
       with:

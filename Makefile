@@ -4,7 +4,7 @@ ifeq ($(ARCH),)
 ARCH := native
 endif
 RTTIFLAGS = -fno-rtti -fno-exceptions
-CXXFLAGS += -Wall -Wextra -Werror -std=c++17 -O3 -ffast-math -march=$(ARCH) -mtune=$(ARCH) -flto $(RTTIFLAGS) $(PGOFLAGS)
+CXXFLAGS += -Wall -Wextra -Werror -std=c++17 -O3 -ffast-math -ftree-vectorize -march=$(ARCH) -mtune=generic -flto $(RTTIFLAGS) $(PGOFLAGS)
 
 version :=
 ifeq ($(version),)
@@ -22,7 +22,7 @@ endif
 endif
 
 release := out/seawall-$(version)$(SUFFIX)
-CPPFLAGS += -DSEAWALL_VERSION=$(version)
+CPPFLAGS += -DSEAWALL_VERSION=$(version) $(EXTRA_CPPFLAGS)
 
 ifeq ($(LLVM_PROFDATA),)
 LLVM_PROFDATA=llvm-profdata

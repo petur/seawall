@@ -3557,7 +3557,7 @@ int Search::qsearch(int ply, int depth, int alpha, int beta)
         if (!checkers && !(type(mv) & PROMOTION) && pat + material[type(position.squares[to(mv)])].mid < alpha - 107)
             continue;
 
-        if (!checkers && !(type(mv) & PROMOTION) && mv != best && see_under(mv, -137))
+        if (!checkers && !(type(mv) & PROMOTION) && mv != best && see_under(mv, -50))
             continue;
 
         ++nodes;

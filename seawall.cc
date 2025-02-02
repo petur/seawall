@@ -3180,15 +3180,15 @@ struct alignas(4) EvalCache
     std::int16_t value;
 };
 
-constexpr int EVAL_CACHE_SIZE = 1 << 12;
-constexpr std::uint64_t EVAL_CACHE_MASK = EVAL_CACHE_SIZE - 1;
-alignas(64) static EvalCache eval_cache[EVAL_CACHE_SIZE];
+static std::size_t eval_cache_size;
+static std::uint64_t eval_cache_mask;
+static EvalCache* eval_cache;
 
 int evaluate(int alpha = -SCORE_WIN, int beta = SCORE_WIN)
 {
     std::uint64_t hash_key = position.hash();
     std::uint16_t eval_key = hash_key >> 48;
-    auto& ec = eval_cache[hash_key & EVAL_CACHE_MASK];
+    auto& ec = eval_cache[hash_key & eval_cache_mask];
     if (ec.key == eval_key)
         return ec.value;
 
@@ -3944,10 +3944,31 @@ bool get_command(std::istream& in, std::deque<std::string>& commands, std::strin
     return true;
 }
 
+void resize_hash(std::size_t hash_mb)
+{
+    std::size_t new_eval_cache_size = 1ULL << (63 - __builtin_clzll((hash_mb << 20) / 16 / sizeof(EvalCache)));
+    if (new_eval_cache_size != eval_cache_size)
+    {
+        delete[] eval_cache;
+        eval_cache_size = new_eval_cache_size;
+        eval_cache_mask = eval_cache_size - 1;
+        eval_cache = new EvalCache[eval_cache_size];
+        std::fill_n(eval_cache, eval_cache_size, EvalCache{});
+    }
+
+    std::size_t new_hash_size = ((hash_mb << 20) - eval_cache_size * sizeof(EvalCache)) / sizeof(HashEntry);
+    if (new_hash_size != hash_size)
+    {
+        delete[] hash_table;
+        hash_size = new_hash_size;
+        hash_table = new HashEntry[hash_size];
+        std::fill_n(hash_table, hash_size, HashEntry{});
+    }
+}
+
 void uci_main()
 {
     std::string line;
-    std::size_t hash_mb = 1;
     bool debug = false;
     Stack stack[256] = {};
     std::deque<std::string> commands;
@@ -3982,22 +4003,19 @@ void uci_main()
                 c = std::tolower(static_cast<unsigned char>(c));
             if (token == "hash")
             {
+                std::size_t hash_mb = 1;
                 parser >> token;
                 parser >> hash_mb;
+
+                resize_hash(hash_mb);
             }
         }
         else if (token == "isready")
         {
             if (!king_attack[A1])
                 init_bitboards();
-            std::size_t new_hash_size = (hash_mb << 20) / sizeof(HashEntry);
-            if (new_hash_size != hash_size)
-            {
-                delete[] hash_table;
-                hash_size = new_hash_size;
-                hash_table = new HashEntry[hash_size];
-                std::fill_n(hash_table, hash_size, HashEntry{});
-            }
+            if (!hash_table)
+                resize_hash(1);
             std::cout << "readyok" << std::endl;
         }
         else if (token == "ucinewgame")
@@ -4005,7 +4023,7 @@ void uci_main()
             if (hash_table)
                 std::fill_n(hash_table, hash_size, HashEntry{});
             hash_generation = 0;
-            std::fill_n(eval_cache, EVAL_CACHE_SIZE, EvalCache{});
+            std::fill_n(eval_cache, eval_cache_size, EvalCache{});
             for (Color c : {WHITE, BLACK})
                 std::fill_n(history[c], FROM_TO_SIZE, MoveHistory{});
             for (int c = PAWN; c < KING; c++)

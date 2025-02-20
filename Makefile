@@ -61,7 +61,7 @@ test:	seawall
 	./test.sh
 
 tune:	seawall.tune
-	./seawall.tune < filtered/20241124-171359.csv
+	./seawall.tune < filtered/20250213-195904.csv
 
 seawall.tune:	CPPFLAGS += -DTUNE=1
 seawall.tune:	RTTIFLAGS =

@@ -3892,15 +3892,30 @@ void Search::iterate(int max_depth)
         sel_depth = 0;
 
         int alpha = root_depth >= 4 && best_score > -SCORE_WIN ? best_score - 288 : -SCORE_MATE;
-        auto v = search(true, 0, root_depth, alpha, SCORE_MATE);
+        int beta = root_depth >= 4 && best_score < SCORE_WIN ? best_score + 144 : SCORE_MATE;
+        std::pair<int, Move> v;
+        bool fail_high = false;
 
-        if (alpha > -SCORE_MATE && v.first <= alpha && !check_time(changes, improving))
+        for (;;)
         {
-            print_info(root_depth, v.first, true);
-
-            auto vv = search(true, 0, root_depth, -SCORE_MATE, SCORE_MATE);
+            auto vv = search(true, 0, root_depth - fail_high, alpha, beta);
             if (vv.second)
                 v = vv;
+            if (check_time(changes, improving))
+                break;
+            if (alpha > -SCORE_MATE && vv.first <= alpha)
+            {
+                alpha = -SCORE_MATE;
+                fail_high = false;
+            }
+            else if (beta < SCORE_MATE && vv.first >= beta)
+            {
+                beta = SCORE_MATE;
+                fail_high = true;
+            }
+            else
+                break;
+            print_info(root_depth, vv.first, true);
         }
 
         if (v.second)

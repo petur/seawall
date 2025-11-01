@@ -207,7 +207,7 @@ std::ostream& operator<<(std::ostream& out, Castling c)
     return out;
 }
 
-enum Square : std::uint8_t { A1 = 0, H1 = 56, H8 = 63, NO_SQUARE = 0xff };
+enum Square : std::uint8_t { A1 = 0, A8 = 56, H8 = 63, NO_SQUARE = 0xff };
 
 inline Square& operator+=(Square& lhs, int rhs) { return lhs = static_cast<Square>(lhs + rhs); }
 inline Square& operator-=(Square& lhs, int rhs) { return lhs = static_cast<Square>(lhs - rhs); }
@@ -819,9 +819,9 @@ Memo Position::do_move(Move mv)
             if (type(moved) == KING)
                 castling &= ~static_cast<Castling>(3 << (2 * next));
             else if (type(moved) == ROOK)
-                castling &= ~static_cast<Castling>(((from(mv) & 1) ? WK : WQ) << (2 * next));
+                castling &= ~static_cast<Castling>((((from(mv) & 7) == 7) ? WK : WQ) << (2 * next));
             if ((type(mv) & CAPTURE) && type(memo.captured) == ROOK)
-                castling &= ~static_cast<Castling>(((to(mv) & 1) ? WK : WQ) << (2 * ~next));
+                castling &= ~static_cast<Castling>((((to(mv) & 7) == 7) ? WK : WQ) << (2 * ~next));
         }
     }
     else
@@ -870,7 +870,7 @@ void Position::parse(std::istream& fen)
     std::string token;
     fen >> token;
 
-    Square sq = H1;
+    Square sq = A8;
 
     for (char ch : token)
     {

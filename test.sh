@@ -13,6 +13,7 @@ info string fen rnbqk2r/pppp1ppp/3b1n2/4p3/4P3/3B1N2/PPPP1PPP/RNBQKR2 b Qkq - 5 
 info string fen R3k2r/8/8/8/8/8/8/4K2R b Kk - 0 1
 info string fen rnbqkbnr/pp2pppp/3P4/2p5/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1
 info string fen Q6k/8/8/8/8/8/8/7K b - - 0 1
+info string fen 1r2k2r/p1pn1ppp/2Q1p3/1Pbn2q1/2p5/N3P2P/1B1P1PBP/R4RK1 b k - 8 1
 EOF
     ) \
     <(./seawall <<EOF |
@@ -29,6 +30,7 @@ position startpos moves e2e4 e7e5 g1f3 g8f6 f1d3 f8d6 h1f1
 position fen r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1 moves a1a8
 position startpos moves e2e4 c7c5 e4e5 d7d5 e5d6
 position fen 7k/P7/8/8/8/8/8/7K w - - 0 1 moves a7a8q
+position fen rnbqkbnr/p1pppppp/8/1p6/1P6/7N/P1PPPPPP/RNBQKB1R b KQkq - 0 2 moves d7d5 a2a4 b5a4 e2e3 c8h3 g2h3 e7e6 c1b2 g8f6 c2c4 b8d7 d1a4 d5c4 f1g2 f6d5 a4c6 a8b8 b4b5 d8g5 e1g1 f8c5 b1a3 b8b6 c6a8 b6b8 a8c6
 quit
 EOF
     grep '^info')

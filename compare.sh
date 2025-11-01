@@ -23,8 +23,8 @@ done
 branch=$(git branch --show-current)
 
 fastchess \
-    -engine cmd="./branches/seawall-${branch}" name="seawall-${branch}" \
-    -engine cmd="./branches/seawall-${base}" name="seawall-${base}" \
+    -engine cmd="./branches/seawall-${branch}" name="seawall-${branch} #1" \
+    -engine cmd="./branches/seawall-${base}" name="seawall-${base} #2" \
     -each option.Hash="$hash" tc="$tc" \
     -openings file=./books/testing.fen format=epd order=random \
     -rounds 1000000 -repeat \

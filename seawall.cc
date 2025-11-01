@@ -3640,8 +3640,6 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
 
     if (ply >= sel_depth)
         sel_depth = ply + 1;
-    if (pv)
-        pv_lines[ply + 1].length = 0;
     stack[ply].singular = false;
 
     if (!pv &&
@@ -3759,6 +3757,9 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
         ++nodes;
         ++move_count;
 
+        if (pv)
+            pv_lines[ply + 1].length = 0;
+
         Memo memo = do_move(ply, mv);
 
         int v = beta;
@@ -3803,7 +3804,7 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
             alpha = v;
             best = mv;
 
-            if (pv && ply == 0 && alpha < beta)
+            if (pv && alpha < beta)
                 update_pv(best, ply, depth <= 1);
         }
         if (alpha >= beta)
@@ -3814,13 +3815,13 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     }
 
     if (move_count == 0)
+        return {skip_move ? alpha : checkers ? -SCORE_MATE + ply : 0, NO_MOVE};
+    if (ply > 0 && position.halfmove_clock >= 100)
     {
         if (pv)
             pv_lines[ply].length = 0;
-        return {skip_move ? alpha : checkers ? -SCORE_MATE + ply : 0, NO_MOVE};
-    }
-    if (ply > 0 && position.halfmove_clock >= 100)
         return {0, NULL_MOVE};
+    }
 
     assert(alpha > -SCORE_MATE);
     if (alpha >= beta)
@@ -3847,8 +3848,6 @@ std::pair<int, Move> Search::search(bool pv, int ply, int depth, int alpha, int 
     }
     save_hash(alpha, ply, depth, best ? best : prev_best, orig_alpha, beta, skip_move);
 
-    if (pv && alpha > orig_alpha && alpha < beta)
-        update_pv(best, ply, depth <= 1);
     return {alpha, best};
 }
 
@@ -3884,10 +3883,10 @@ void Search::iterate(int max_depth)
     int changes = 0;
     int improving = 0;
     int last_change = 0;
-    pv_lines[0].length = 0;
 
     for (root_depth = 1; root_depth <= max_depth; ++root_depth)
     {
+        pv_lines[0].length = 0;
         std::fill_n(pawn_eval_cache, PAWN_EVAL_CACHE_SIZE, PawnEvalCache{});
         sel_depth = 0;
 

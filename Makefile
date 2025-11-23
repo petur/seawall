@@ -69,7 +69,11 @@ seawall.tune:	LDLIBS += -ltbb
 seawall.tune:	seawall.cc
 	$(LINK.cc) $^ $(LDLIBS) -o $@
 
+seawall.debug:	CXXFLAGS += -g
+seawall.debug:	seawall.cc
+	$(LINK.cc) $^ $(LDLIBS) -o $@
+
 clean:
-	$(RM) -r seawall seawall.tune profile
+	$(RM) -r seawall seawall.tune seawall.debug profile
 
 .PHONY:	all test tune clean

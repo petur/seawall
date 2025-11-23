@@ -5,6 +5,10 @@ set -e
 hash='4'
 tc='3+0.03'
 base='main'
+variant='fischerandom'
+book='./books/dfrc.fen'
+loglevel='warn'
+enginelog='false'
 for arg in "$@"; do
     case "$arg" in
     hash=*)
@@ -16,6 +20,18 @@ for arg in "$@"; do
     base=*)
         base="${arg#base=}"
         ;;
+    variant=*)
+        variant="${arg#variant=}"
+        ;;
+    book=*)
+        book="${arg#book=}"
+        ;;
+    loglevel=*)
+        loglevel="${arg#loglevel=}"
+        ;;
+    enginelog=*)
+        enginelog="${arg#enginelog=}"
+        ;;
     esac
 done
 
@@ -26,9 +42,10 @@ fastchess \
     -engine cmd="./branches/seawall-${branch}" name="seawall-${branch} #1" \
     -engine cmd="./branches/seawall-${base}" name="seawall-${base} #2" \
     -each option.Hash="$hash" tc="$tc" \
-    -openings file=./books/testing.fen format=epd order=random \
+    -variant "${variant}" \
+    -openings file="${book}" format=epd order=random \
     -rounds 1000000 -repeat \
     -concurrency 6 \
     -sprt elo0=0 elo1=4 alpha=0.05 beta=0.05 \
-    -log file=compare.log \
+    -log file=compare.log level="${loglevel}" engine="${enginelog}" \
     -pgnout file="pgn/$(date '+%Y%m%d-%H%M%S').pgn"

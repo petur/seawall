@@ -58,5 +58,8 @@ echo 'position fen 7Q/8/8/8/8/8/8/5K1k b - - 0 1'
 echo 'go depth 1'
 echo 'position fen 6k1/5p1p/2pB4/8/1ppPp3/2n1P2p/p1PK1q2/Q7 w - - 0 49 moves d2c1 f2f1 c1d2 c3b1'
 echo 'go wtime 33 winc 0 btime 31 binc 0 movestogo 32'
+echo 'setoption name UCI_Chess960 value true'
+echo 'position fen rkbqnnrb/pppppppp/8/8/8/8/PPPPPPPP/BBRKQNRN w GCga - 0 1'
+echo 'go wtime 3030 btime 3030 winc 30 binc 30'
 echo 'quit'
 ) | ./seawall

@@ -11,3 +11,4 @@ c-chess-cli.*.log
 compare.log
 config.json
 pgn/
+seawall.debug

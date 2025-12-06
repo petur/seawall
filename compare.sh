@@ -6,7 +6,7 @@ hash='4'
 tc='3+0.03'
 base='main'
 variant='fischerandom'
-book='./books/dfrc.fen'
+book='./books/dfrc-sp.fen'
 loglevel='warn'
 enginelog='false'
 for arg in "$@"; do

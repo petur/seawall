@@ -1583,6 +1583,30 @@ static constexpr int pawnless_king_table[64] =
     -42, -43, -12, -4, -4, -12, -43, -42,
 };
 
+static constexpr int light_bishop_knight_table[64] =
+{
+    -42, -43, -12, -4, -3, -2, -1, 0,
+    -43, -4, 4, 6, 7, 8, 9, -1,
+    -12, 4, 7, 8, 9, 10, 8, -2,
+    -4, 6, 8, 9, 10, 9, 7, -3,
+    -3, 7, 9, 10, 9, 8, 6, -4,
+    -2, 8, 10, 9, 8, 7, 4, -12,
+    -1, 9, 8, 7, 6, 4, -4, -43,
+    0, -1, -2, -3, -4, -12, -43, -42,
+};
+
+static constexpr int dark_bishop_knight_table[64] =
+{
+    0, -1, -2, -3, -4, -12, -43, -42,
+    -1, 9, 8, 7, 6, 4, -4, -43,
+    -2, 8, 10, 9, 8, 7, 4, -12,
+    -3, 7, 9, 10, 9, 8, 6, -4,
+    -4, 6, 8, 9, 10, 9, 7, -3,
+    -12, 4, 7, 8, 9, 10, 8, -2,
+    -43, -4, 4, 6, 7, 8, 9, -1,
+    -42, -43, -12, -4, -3, -2, -1, 0,
+};
+
 int evaluate_pawnless(const Position& pos, int v)
 {
     int piece_count = popcount(pos.all_bb());
@@ -1619,6 +1643,16 @@ int evaluate_pawnless(const Position& pos, int v)
             v /= 16;
         else if (std::abs(v) < 2 * material[PAWN].end)
             v /= 2;
+
+        if (piece_count == 4 && (!(pos.color_bb[WHITE] & ~pos.type_bb[KING]) || !(pos.color_bb[BLACK] & ~pos.type_bb[KING]))
+                && pos.type_bb[KNIGHT] && pos.type_bb[BISHOP])
+        {
+            if (pos.type_bb[BISHOP] & LIGHT_SQUARES)
+                king_value = light_bishop_knight_table[own_king_sq] - light_bishop_knight_table[opp_king_sq];
+            else
+                king_value = dark_bishop_knight_table[own_king_sq] - dark_bishop_knight_table[opp_king_sq];
+        }
+
         v += king_value;
         v += 8;
     }
@@ -2161,7 +2195,48 @@ int evaluate_single_pawn(const Position& pos, int v)
         return v + (C == pos.next ? 1 : -1) * material[QUEEN].end;
     }
 
-    if (smear<FWD>(shift_signed<FWD>(own_pawns)) & pos.type_bb[KING] & pos.color_bb[~C])
+    BitBoard pawn_path = smear<FWD>(shift_signed<FWD>(own_pawns));
+
+    if (!(pos.color_bb[~C] & ~pos.type_bb[KING]))
+    {
+        if (!(pawn_path & pos.color_bb[C]))
+        {
+            unsigned flip = ((C == WHITE) ? 0 : 56);
+            unsigned opp_king = first_square(pos.type_bb[KING] & pos.color_bb[~C]) ^ flip;
+            unsigned pawn = first_square(own_pawns) ^ flip;
+
+            if ((pawn >> 3) > (opp_king >> 3) + (C != pos.next))
+                return v + (C == pos.next ? 1 : -1) * material[ROOK].end;
+            if (7 - static_cast<int>(pawn >> 3) < std::abs(static_cast<int>(opp_king & 7) - static_cast<int>(pawn & 7)) - (C != pos.next))
+                return v + (C == pos.next ? 1 : -1) * material[ROOK].end;
+
+            Square own_king = first_square(pos.type_bb[KING] & pos.color_bb[C]);
+            if (!(pawn_path & ~king_attack[own_king]))
+                return v + (C == pos.next ? 1 : -1) * material[ROOK].end;
+        }
+
+        if (pos.type_bb[QUEEN] || pos.type_bb[ROOK])
+            return v + (C == pos.next ? 1 : -1) * material[BISHOP].end;
+
+        if (pos.type_bb[BISHOP])
+        {
+            if ((own_pawns & ~(FILE_A | FILE_H)) ||
+                    ((pos.type_bb[BISHOP] & LIGHT_SQUARES) && (own_pawns & (C == WHITE ? FILE_A : FILE_H))) ||
+                    ((pos.type_bb[BISHOP] & DARK_SQUARES) && (own_pawns & (C == WHITE ? FILE_H : FILE_A))))
+                return v + (C == pos.next ? 1 : -1) * material[PAWN].mid;
+
+            if (popcount(pos.color_bb[C]) == 3)
+            {
+                Square opp_king = first_square(pos.type_bb[KING] & pos.color_bb[~C]);
+                BitBoard opp_king_moves = king_attack[opp_king] | bb(opp_king);
+
+                if (pawn_path & opp_king_moves & (C == WHITE ? RANK_8 : RANK_1))
+                    return 0;
+            }
+        }
+    }
+
+    if (pawn_path & pos.type_bb[KING] & pos.color_bb[~C])
         v /= 2;
     return v;
 }

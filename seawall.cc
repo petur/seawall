@@ -4033,7 +4033,7 @@ void Search::iterate(int max_depth)
         std::fill_n(pawn_eval_cache, PAWN_EVAL_CACHE_SIZE, PawnEvalCache{});
         sel_depth = 0;
 
-        int alpha = root_depth >= 4 && best_score > -SCORE_WIN ? best_score - 288 : -SCORE_MATE;
+        int alpha = root_depth >= 4 && best_score > -SCORE_WIN ? best_score - 256 : -SCORE_MATE;
         int beta = root_depth >= 4 && best_score < SCORE_WIN ? best_score + 144 : SCORE_MATE;
         std::pair<int, Move> v;
         bool fail_high = false;
